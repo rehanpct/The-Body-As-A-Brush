@@ -7,6 +7,9 @@ public class HandTrackingBrush : MonoBehaviour
     [Header("MediaPipe")]
     public HandLandmarkerRunner handLandmarkerRunner;
 
+    [Header("Gesture Manager")]
+    public GestureManager gestureManager;
+
     [Header("Brush")]
     public Transform brush;
 
@@ -17,12 +20,14 @@ public class HandTrackingBrush : MonoBehaviour
     private float targetY;
 
     private bool handDetected = false;
-    private bool indexDrawingPose = false;
 
     public bool IsHandDetected => handDetected;
 
-    // This will be used by BrushTrail.
-    public bool IsIndexDrawing => indexDrawingPose;
+    // Water drawing is allowed ONLY during Index gesture.
+    public bool IsIndexDrawing =>
+        gestureManager != null &&
+        gestureManager.CurrentGesture ==
+        GestureManager.Gesture.Index;
 
     void Start()
     {
@@ -32,12 +37,23 @@ public class HandTrackingBrush : MonoBehaviour
         }
         else
         {
-            Debug.LogError("HandLandmarkerRunner is not assigned!");
+            Debug.LogError(
+                "HandTrackingBrush: HandLandmarkerRunner is not assigned!"
+            );
         }
 
         if (brush == null)
         {
-            Debug.LogError("Brush is not assigned!");
+            Debug.LogError(
+                "HandTrackingBrush: Brush is not assigned!"
+            );
+        }
+
+        if (gestureManager == null)
+        {
+            Debug.LogError(
+                "HandTrackingBrush: GestureManager is not assigned!"
+            );
         }
     }
 
@@ -47,7 +63,6 @@ public class HandTrackingBrush : MonoBehaviour
             result.handLandmarks.Count == 0)
         {
             handDetected = false;
-            indexDrawingPose = false;
             return;
         }
 
@@ -57,46 +72,15 @@ public class HandTrackingBrush : MonoBehaviour
             hand.landmarks.Count < 21)
         {
             handDetected = false;
-            indexDrawingPose = false;
             return;
         }
 
-        // Index fingertip = landmark 8.
         var indexTip = hand.landmarks[8];
 
         targetX = indexTip.x;
         targetY = 1f - indexTip.y;
 
         handDetected = true;
-
-        // Check whether index finger is extended
-        // while the other three fingers are folded.
-        indexDrawingPose = IsIndexFingerPose(hand);
-    }
-
-    bool IsIndexFingerPose(
-        Mediapipe.Tasks.Components.Containers.NormalizedLandmarks hand)
-    {
-        bool indexOpen =
-            hand.landmarks[8].y <
-            hand.landmarks[6].y;
-
-        bool middleClosed =
-            hand.landmarks[12].y >
-            hand.landmarks[10].y;
-
-        bool ringClosed =
-            hand.landmarks[16].y >
-            hand.landmarks[14].y;
-
-        bool pinkyClosed =
-            hand.landmarks[20].y >
-            hand.landmarks[18].y;
-
-        return indexOpen &&
-               middleClosed &&
-               ringClosed &&
-               pinkyClosed;
     }
 
     void Update()
@@ -116,7 +100,9 @@ public class HandTrackingBrush : MonoBehaviour
         );
 
         Vector3 worldPosition =
-            mainCamera.ScreenToWorldPoint(screenPosition);
+            mainCamera.ScreenToWorldPoint(
+                screenPosition
+            );
 
         worldPosition.z = 0f;
 
@@ -131,7 +117,8 @@ public class HandTrackingBrush : MonoBehaviour
     {
         if (handLandmarkerRunner != null)
         {
-            handLandmarkerRunner.OnResultUpdated -= OnHandResult;
+            handLandmarkerRunner.OnResultUpdated -=
+                OnHandResult;
         }
     }
 }

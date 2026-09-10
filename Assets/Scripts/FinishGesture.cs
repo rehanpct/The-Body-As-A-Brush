@@ -15,11 +15,15 @@ public class FinishGesture : MonoBehaviour
     [Header("Save Settings")]
     public string fileNamePrefix = "BodyAsBrush_Artwork_";
 
-    private bool bothHandsDetected = false;
-    private bool handsTogether = false;
+    // Data received from MediaPipe callback
+    private bool detectedBothHands = false;
+    private bool detectedHandsTogether = false;
 
+    // Main-thread state
     private float holdTimer = 0f;
     private bool alreadyFinished = false;
+
+    private readonly object finishLock = new object();
 
     void Start()
     {
@@ -35,36 +39,41 @@ public class FinishGesture : MonoBehaviour
         }
     }
 
+    // IMPORTANT:
+    // Do not use Unity API or Time.time here.
     void OnHandResult(HandLandmarkerResult result)
     {
-        if (result.handLandmarks == null ||
-            result.handLandmarks.Count < 2)
+        bool newBothHandsDetected = false;
+        bool newHandsTogether = false;
+
+        if (result.handLandmarks != null &&
+            result.handLandmarks.Count >= 2)
         {
-            bothHandsDetected = false;
-            handsTogether = false;
-            return;
+            var hand1 = result.handLandmarks[0];
+            var hand2 = result.handLandmarks[1];
+
+            if (hand1.landmarks != null &&
+                hand2.landmarks != null &&
+                hand1.landmarks.Count >= 21 &&
+                hand2.landmarks.Count >= 21)
+            {
+                Vector2 palm1 = GetPalmCenter(hand1);
+                Vector2 palm2 = GetPalmCenter(hand2);
+
+                float distance =
+                    Vector2.Distance(palm1, palm2);
+
+                newBothHandsDetected = true;
+                newHandsTogether =
+                    distance < handsTogetherDistance;
+            }
         }
 
-        bothHandsDetected = true;
-
-        var hand1 = result.handLandmarks[0];
-        var hand2 = result.handLandmarks[1];
-
-        if (hand1.landmarks == null ||
-            hand2.landmarks == null ||
-            hand1.landmarks.Count < 21 ||
-            hand2.landmarks.Count < 21)
+        lock (finishLock)
         {
-            handsTogether = false;
-            return;
+            detectedBothHands = newBothHandsDetected;
+            detectedHandsTogether = newHandsTogether;
         }
-
-        Vector2 palm1 = GetPalmCenter(hand1);
-        Vector2 palm2 = GetPalmCenter(hand2);
-
-        float distance = Vector2.Distance(palm1, palm2);
-
-        handsTogether = distance < handsTogetherDistance;
     }
 
     Vector2 GetPalmCenter(
@@ -72,7 +81,6 @@ public class FinishGesture : MonoBehaviour
     {
         Vector2 center = Vector2.zero;
 
-        // Wrist + four main palm joints.
         center += new Vector2(
             hand.landmarks[0].x,
             hand.landmarks[0].y
@@ -103,12 +111,31 @@ public class FinishGesture : MonoBehaviour
 
     void Update()
     {
-        if (!bothHandsDetected || !handsTogether)
+        bool bothHands;
+        bool handsTogether;
+
+        lock (finishLock)
+        {
+            bothHands = detectedBothHands;
+            handsTogether = detectedHandsTogether;
+        }
+
+        // Hands separated or one hand disappeared.
+        // Reset the timer and ARM the next artwork.
+        if (!bothHands || !handsTogether)
         {
             holdTimer = 0f;
+
+            if (alreadyFinished)
+            {
+                alreadyFinished = false;
+                Debug.Log("Finish gesture re-armed.");
+            }
+
             return;
         }
 
+        // Already finished this hands-together event.
         if (alreadyFinished)
             return;
 
@@ -138,7 +165,6 @@ public class FinishGesture : MonoBehaviour
 
     IEnumerator SaveArtwork()
     {
-        // Wait until the current frame has finished rendering.
         yield return new WaitForEndOfFrame();
 
         string timestamp =
@@ -158,10 +184,6 @@ public class FinishGesture : MonoBehaviour
         Debug.Log(
             "Artwork saved to:\n" + path
         );
-
-        // Allow another artwork to be finished later.
-        holdTimer = 0f;
-        alreadyFinished = false;
     }
 
     void OnDestroy()
