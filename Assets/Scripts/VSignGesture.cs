@@ -73,13 +73,13 @@ public class VSignGesture : MonoBehaviour
         centerPosition.z = 0f;
 
         Vector2[] formation =
-        {
-            new Vector2(-horizontalSpacing, 0.3f),
-            new Vector2(0f, 0.5f),
-            new Vector2(horizontalSpacing, 0.3f),
-            new Vector2(-0.5f, -0.3f),
-            new Vector2(0.5f, -0.3f)
-        };
+    {
+        new Vector2(-0.8f, 0.2f),
+        new Vector2(0f, 0.5f),
+        new Vector2(0.8f, 0.2f),
+        new Vector2(-0.4f, -0.3f),
+        new Vector2(0.4f, -0.3f)
+    };
 
         int count =
             Mathf.Min(
