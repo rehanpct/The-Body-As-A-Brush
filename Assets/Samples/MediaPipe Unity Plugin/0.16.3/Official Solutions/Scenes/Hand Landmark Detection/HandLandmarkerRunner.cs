@@ -14,72 +14,115 @@ namespace Mediapipe.Unity.Sample.HandLandmarkDetection
 {
   public class HandLandmarkerRunner : VisionTaskApiRunner<HandLandmarker>
   {
-    // Sends the detected hand result to other scripts.
+    // Sends detected hand results to other scripts.
     public event Action<HandLandmarkerResult> OnResultUpdated;
 
-    [SerializeField] private HandLandmarkerResultAnnotationController _handLandmarkerResultAnnotationController;
+    [SerializeField]
+    private HandLandmarkerResultAnnotationController
+      _handLandmarkerResultAnnotationController;
 
     private Experimental.TextureFramePool _textureFramePool;
 
-    public readonly HandLandmarkDetectionConfig config = new HandLandmarkDetectionConfig();
+    public readonly HandLandmarkDetectionConfig config =
+      new HandLandmarkDetectionConfig();
+
+    [Header("Performance")]
+    [SerializeField]
+    private float targetInferenceFPS = 20f;
+
+    private float inferenceInterval;
 
     public override void Stop()
     {
       base.Stop();
+
       _textureFramePool?.Dispose();
       _textureFramePool = null;
     }
 
     protected override IEnumerator Run()
     {
+      Debug.Log("====================================");
+      Debug.Log("HAND TRACKER CONFIGURATION");
+
       Debug.Log($"Delegate = {config.Delegate}");
       Debug.Log($"Image Read Mode = {config.ImageReadMode}");
       Debug.Log($"Running Mode = {config.RunningMode}");
-      Debug.Log($"NumHands = {config.NumHands}");
-      Debug.Log($"MinHandDetectionConfidence = {config.MinHandDetectionConfidence}");
-      Debug.Log($"MinHandPresenceConfidence = {config.MinHandPresenceConfidence}");
-      Debug.Log($"MinTrackingConfidence = {config.MinTrackingConfidence}");
-
-      yield return AssetLoader.PrepareAssetAsync(config.ModelPath);
-
-      var options = config.GetHandLandmarkerOptions(
-        config.RunningMode == Tasks.Vision.Core.RunningMode.LIVE_STREAM
-          ? OnHandLandmarkDetectionOutput
-          : null
+      Debug.Log($"Num Hands = {config.NumHands}");
+      Debug.Log(
+        $"Min Hand Detection Confidence = " +
+        $"{config.MinHandDetectionConfidence}"
+      );
+      Debug.Log(
+        $"Min Hand Presence Confidence = " +
+        $"{config.MinHandPresenceConfidence}"
+      );
+      Debug.Log(
+        $"Min Tracking Confidence = " +
+        $"{config.MinTrackingConfidence}"
       );
 
-      taskApi = HandLandmarker.CreateFromOptions(
-        options,
-        GpuManager.GpuResources
+      Debug.Log("====================================");
+
+      inferenceInterval =
+        1f / Mathf.Max(1f, targetInferenceFPS);
+
+      yield return AssetLoader.PrepareAssetAsync(
+        config.ModelPath
       );
 
-      var imageSource = ImageSourceProvider.ImageSource;
+      var options =
+        config.GetHandLandmarkerOptions(
+          config.RunningMode ==
+          Tasks.Vision.Core.RunningMode.LIVE_STREAM
+            ? OnHandLandmarkDetectionOutput
+            : null
+        );
+
+      taskApi =
+        HandLandmarker.CreateFromOptions(
+          options,
+          GpuManager.GpuResources
+        );
+
+      var imageSource =
+        ImageSourceProvider.ImageSource;
 
       yield return imageSource.Play();
 
       if (!imageSource.isPrepared)
       {
-        Debug.LogError("Failed to start ImageSource, exiting...");
+        Debug.LogError(
+          "Failed to start ImageSource, exiting..."
+        );
+
         yield break;
       }
 
-      // Use RGBA32 as the input format.
-      // TODO: When using GpuBuffer, MediaPipe assumes that the input
-      // format is BGRA, so maybe the following code needs to be fixed.
-      _textureFramePool = new Experimental.TextureFramePool(
-        imageSource.textureWidth,
-        imageSource.textureHeight,
-        TextureFormat.RGBA32,
-        10
+      Debug.Log(
+        $"Webcam Resolution = " +
+        $"{imageSource.textureWidth} x " +
+        $"{imageSource.textureHeight}"
       );
 
-      // NOTE: The screen will be resized later, keeping the aspect ratio.
+      _textureFramePool =
+        new Experimental.TextureFramePool(
+          imageSource.textureWidth,
+          imageSource.textureHeight,
+          TextureFormat.RGBA32,
+          4
+        );
+
       screen.Initialize(imageSource);
 
-      SetupAnnotationController(
-        _handLandmarkerResultAnnotationController,
-        imageSource
-      );
+      /*
+       * We intentionally do not continuously draw
+       * MediaPipe's annotation overlay.
+       *
+       * Your final project hides the webcam anyway,
+       * so drawing the landmark overlay is unnecessary
+       * processing.
+       */
 
       var transformationOptions =
         imageSource.GetTransformationOptions();
@@ -92,7 +135,8 @@ namespace Mediapipe.Unity.Sample.HandLandmarkDetection
 
       var imageProcessingOptions =
         new Tasks.Vision.Core.ImageProcessingOptions(
-          rotationDegrees: (int)transformationOptions.rotationAngle
+          rotationDegrees:
+            (int)transformationOptions.rotationAngle
         );
 
       AsyncGPUReadbackRequest req = default;
@@ -104,10 +148,16 @@ namespace Mediapipe.Unity.Sample.HandLandmarkDetection
         new WaitForEndOfFrame();
 
       var result =
-        HandLandmarkerResult.Alloc(options.numHands);
+        HandLandmarkerResult.Alloc(
+          options.numHands
+        );
 
-      // NOTE: We can share the GL context of the render thread
-      // with MediaPipe (for now, only on Android).
+      /*
+       * GPU image input is not available on your
+       * current Windows configuration.
+       *
+       * Therefore we use CPU input safely.
+       */
       var canUseGpuImage =
         SystemInfo.graphicsDeviceType ==
         GraphicsDeviceType.OpenGLES3 &&
@@ -118,20 +168,47 @@ namespace Mediapipe.Unity.Sample.HandLandmarkDetection
           ? GpuManager.GetGlContext()
           : null;
 
+      float nextInferenceTime = 0f;
+
       while (true)
       {
         if (isPaused)
         {
-          yield return new WaitWhile(() => isPaused);
+          yield return new WaitWhile(
+            () => isPaused
+          );
         }
 
-        if (!_textureFramePool.TryGetTextureFrame(out var textureFrame))
+        /*
+         * Limit MediaPipe processing rate.
+         *
+         * Webcam may provide 30 FPS,
+         * but CPU hand tracking does not need
+         * to process every frame.
+         */
+        if (
+          Time.realtimeSinceStartup <
+          nextInferenceTime
+        )
         {
-          yield return new WaitForEndOfFrame();
+          yield return null;
           continue;
         }
 
-        // Build the input Image.
+        nextInferenceTime =
+          Time.realtimeSinceStartup +
+          inferenceInterval;
+
+        if (
+          !_textureFramePool.TryGetTextureFrame(
+            out var textureFrame
+          )
+        )
+        {
+          yield return null;
+          continue;
+        }
+
         Image image;
 
         switch (config.ImageReadMode)
@@ -140,9 +217,15 @@ namespace Mediapipe.Unity.Sample.HandLandmarkDetection
 
             if (!canUseGpuImage)
             {
-              throw new System.Exception(
-                "ImageReadMode.GPU is not supported"
+              textureFrame.Release();
+
+              Debug.LogWarning(
+                "GPU image mode is not supported. " +
+                "Use CPU or CPUAsync."
               );
+
+              yield return null;
+              continue;
             }
 
             textureFrame.ReadTextureOnGPU(
@@ -151,10 +234,11 @@ namespace Mediapipe.Unity.Sample.HandLandmarkDetection
               flipVertically
             );
 
-            image = textureFrame.BuildGPUImage(glContext);
+            image =
+              textureFrame.BuildGPUImage(
+                glContext
+              );
 
-            // Wait one frame to make sure the texture
-            // is fully copied before sending it to MediaPipe.
             yield return waitForEndOfFrame;
 
             break;
@@ -169,7 +253,8 @@ namespace Mediapipe.Unity.Sample.HandLandmarkDetection
               flipVertically
             );
 
-            image = textureFrame.BuildCPUImage();
+            image =
+              textureFrame.BuildCPUImage();
 
             textureFrame.Release();
 
@@ -178,24 +263,33 @@ namespace Mediapipe.Unity.Sample.HandLandmarkDetection
           case ImageReadMode.CPUAsync:
           default:
 
-            req = textureFrame.ReadTextureAsync(
-              imageSource.GetCurrentTexture(),
-              flipHorizontally,
-              flipVertically
-            );
+            req =
+              textureFrame.ReadTextureAsync(
+                imageSource.GetCurrentTexture(),
+                flipHorizontally,
+                flipVertically
+              );
 
             yield return waitUntilReqDone;
 
+            /*
+             * A webcam frame can occasionally fail.
+             * Do not kill the tracking loop.
+             */
             if (req.hasError)
             {
+              textureFrame.Release();
+
               Debug.LogWarning(
-                "Failed to read texture from the image source"
+                "MediaPipe skipped a webcam frame."
               );
 
+              yield return null;
               continue;
             }
 
-            image = textureFrame.BuildCPUImage();
+            image =
+              textureFrame.BuildCPUImage();
 
             textureFrame.Release();
 
@@ -206,18 +300,18 @@ namespace Mediapipe.Unity.Sample.HandLandmarkDetection
         {
           case Tasks.Vision.Core.RunningMode.IMAGE:
 
-            if (taskApi.TryDetect(
-              image,
-              imageProcessingOptions,
-              ref result
-            ))
+            if (
+              taskApi.TryDetect(
+                image,
+                imageProcessingOptions,
+                ref result
+              )
+            )
             {
-              _handLandmarkerResultAnnotationController.DrawNow(result);
-            }
-            else
-            {
-              _handLandmarkerResultAnnotationController.DrawNow(
-                default
+              OnHandLandmarkDetectionOutput(
+                result,
+                image,
+                GetCurrentTimestampMillisec()
               );
             }
 
@@ -225,19 +319,19 @@ namespace Mediapipe.Unity.Sample.HandLandmarkDetection
 
           case Tasks.Vision.Core.RunningMode.VIDEO:
 
-            if (taskApi.TryDetectForVideo(
-              image,
-              GetCurrentTimestampMillisec(),
-              imageProcessingOptions,
-              ref result
-            ))
+            if (
+              taskApi.TryDetectForVideo(
+                image,
+                GetCurrentTimestampMillisec(),
+                imageProcessingOptions,
+                ref result
+              )
+            )
             {
-              _handLandmarkerResultAnnotationController.DrawNow(result);
-            }
-            else
-            {
-              _handLandmarkerResultAnnotationController.DrawNow(
-                default
+              OnHandLandmarkDetectionOutput(
+                result,
+                image,
+                GetCurrentTimestampMillisec()
               );
             }
 
@@ -262,10 +356,13 @@ namespace Mediapipe.Unity.Sample.HandLandmarkDetection
       long timestamp
     )
     {
-      // Keep the original MediaPipe visualization.
-      _handLandmarkerResultAnnotationController.DrawLater(result);
+      /*
+       * Do NOT call Unity APIs here.
+       *
+       * This callback can occur on a MediaPipe
+       * worker thread.
+       */
 
-      // Send the result to our own scripts.
       OnResultUpdated?.Invoke(result);
     }
   }

@@ -1,6 +1,4 @@
 using UnityEngine;
-using Mediapipe.Tasks.Vision.HandLandmarker;
-using Mediapipe.Unity.Sample.HandLandmarkDetection;
 
 public class OpenPalmGesture : MonoBehaviour
 {
@@ -10,14 +8,7 @@ public class OpenPalmGesture : MonoBehaviour
     [Header("Coral")]
     public GameObject elementPrefab;
 
-    [Header("Settings")]
-    public float spawnCooldown = 1.0f;
-
-    private float nextSpawnTime = 0f;
-    private bool wasOpenPalm = false;
-
-    private float targetX;
-    private float targetY;
+    private bool hasSpawnedForCurrentPalm = false;
 
     void Start()
     {
@@ -38,18 +29,23 @@ public class OpenPalmGesture : MonoBehaviour
             gestureManager.CurrentGesture ==
             GestureManager.Gesture.OpenPalm;
 
-        // Only trigger when entering Open Palm.
-        if (isOpenPalm && !wasOpenPalm)
+        // Open palm detected
+        if (isOpenPalm)
         {
-            if (Time.time >= nextSpawnTime)
-            {
-                SpawnCoral();
-                nextSpawnTime =
-                    Time.time + spawnCooldown;
-            }
+            // Already spawned for this gesture
+            if (hasSpawnedForCurrentPalm)
+                return;
+
+            SpawnCoral();
+
+            hasSpawnedForCurrentPalm = true;
+
+            return;
         }
 
-        wasOpenPalm = isOpenPalm;
+        // Hand changed to Neutral/another gesture.
+        // Allow the next Open Palm to trigger.
+        hasSpawnedForCurrentPalm = false;
     }
 
     void SpawnCoral()
@@ -59,15 +55,10 @@ public class OpenPalmGesture : MonoBehaviour
             Debug.LogError(
                 "OpenPalmGesture: Coral prefab is not assigned!"
             );
+
             return;
         }
 
-        Camera mainCamera = Camera.main;
-
-        if (mainCamera == null)
-            return;
-
-        // Use current hand position from HandTrackingBrush.
         HandTrackingBrush brush =
             FindFirstObjectByType<HandTrackingBrush>();
 
@@ -84,5 +75,9 @@ public class OpenPalmGesture : MonoBehaviour
             spawnPosition,
             Quaternion.identity
         );
+        if (ArtworkStatistics.Instance != null)
+        {
+            ArtworkStatistics.Instance.data.coralCount++;
+        }
     }
 }

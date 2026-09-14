@@ -156,9 +156,14 @@ public class FinishGesture : MonoBehaviour
         }
     }
 
-    void FinishArtwork()
+   void FinishArtwork()
     {
         Debug.Log("ARTWORK FINISHED!");
+
+        if (ArtworkStatistics.Instance != null)
+        {
+            ArtworkStatistics.Instance.FinalizeStatistics();
+        }
 
         StartCoroutine(SaveArtwork());
     }

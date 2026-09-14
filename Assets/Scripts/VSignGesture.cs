@@ -10,12 +10,10 @@ public class VSignGesture : MonoBehaviour
 
     [Header("School Settings")]
     public int elementCount = 5;
-    public float horizontalSpacing = 0.8f;
-    public float verticalSpacing = 0.5f;
-    public float spawnCooldown = 1.5f;
 
-    private float nextSpawnTime = 0f;
-    private bool wasVSign = false;
+    public float spawnRadius = 1.0f;
+
+    private bool hasSpawnedForCurrentV = false;
 
     void Start()
     {
@@ -36,19 +34,27 @@ public class VSignGesture : MonoBehaviour
             gestureManager.CurrentGesture ==
             GestureManager.Gesture.VSign;
 
-        // Trigger only when entering V Sign.
-        if (isVSign && !wasVSign)
+        // --------------------------------
+        // V SIGN DETECTED
+        // --------------------------------
+        if (isVSign)
         {
-            if (Time.time >= nextSpawnTime)
-            {
-                SpawnFishSchool();
+            // Already spawned for this V sign
+            if (hasSpawnedForCurrentV)
+                return;
 
-                nextSpawnTime =
-                    Time.time + spawnCooldown;
-            }
+            SpawnFishSchool();
+
+            hasSpawnedForCurrentV = true;
+
+            return;
         }
 
-        wasVSign = isVSign;
+        // --------------------------------
+        // V SIGN RELEASED
+        // --------------------------------
+        // Allows the next V sign to trigger.
+        hasSpawnedForCurrentV = false;
     }
 
     void SpawnFishSchool()
@@ -58,6 +64,7 @@ public class VSignGesture : MonoBehaviour
             Debug.LogError(
                 "VSignGesture: Fish prefab is not assigned!"
             );
+
             return;
         }
 
@@ -72,14 +79,15 @@ public class VSignGesture : MonoBehaviour
 
         centerPosition.z = 0f;
 
+        // Fish formation
         Vector2[] formation =
-    {
-        new Vector2(-0.8f, 0.2f),
-        new Vector2(0f, 0.5f),
-        new Vector2(0.8f, 0.2f),
-        new Vector2(-0.4f, -0.3f),
-        new Vector2(0.4f, -0.3f)
-    };
+        {
+            new Vector2(-0.8f,  0.2f),
+            new Vector2( 0.0f,  0.5f),
+            new Vector2( 0.8f,  0.2f),
+            new Vector2(-0.4f, -0.3f),
+            new Vector2( 0.4f, -0.3f)
+        };
 
         int count =
             Mathf.Min(
@@ -102,6 +110,12 @@ public class VSignGesture : MonoBehaviour
                 spawnPosition,
                 Quaternion.identity
             );
+        }
+
+        // Count ONE fish school action
+        if (ArtworkStatistics.Instance != null)
+        {
+            ArtworkStatistics.Instance.data.fishSchoolCount++;
         }
     }
 }

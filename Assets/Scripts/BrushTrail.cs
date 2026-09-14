@@ -9,67 +9,45 @@ public class BrushTrail : MonoBehaviour
     public GameObject waterCurrentPrefab;
 
     [Header("Spawn Settings")]
-    public float minimumSpawnDistance = 0.5f;
-    public float spawnCooldown = 0.08f;
-
-    [Header("Appearance")]
     public float randomRotation = 8f;
     public float randomScaleMin = 0.85f;
     public float randomScaleMax = 1.15f;
 
-    private Vector3 lastSpawnPosition;
-    private bool hasSpawnedFirst = false;
-
-    private float nextSpawnTime = 0f;
+    // Prevents continuous spawning while Index is held
+    private bool hasSpawnedForCurrentIndex = false;
 
     void Update()
     {
         if (handTrackingBrush == null)
             return;
 
-        // Only create water currents when
-        // the index-finger drawing pose is active.
-        if (!handTrackingBrush.IsIndexDrawing)
+        bool isIndex =
+            handTrackingBrush.IsIndexDrawing;
+
+        // --------------------------------
+        // INDEX STARTED
+        // --------------------------------
+        if (isIndex)
         {
-            hasSpawnedFirst = false;
-            return;
-        }
+            // Already spawned for this Index gesture
+            if (hasSpawnedForCurrentIndex)
+                return;
 
-        Vector3 currentPosition =
-            handTrackingBrush.brush.position;
-
-        // First water-current segment
-        if (!hasSpawnedFirst)
-        {
-            SpawnWaterCurrent(currentPosition);
-
-            lastSpawnPosition = currentPosition;
-            hasSpawnedFirst = true;
-
-            return;
-        }
-
-        // Prevent spawning too frequently
-        if (Time.time < nextSpawnTime)
-            return;
-
-        // Only spawn after the finger has moved
-        // a meaningful distance.
-        float distance =
-            Vector3.Distance(
-                lastSpawnPosition,
-                currentPosition
+            // Spawn exactly ONE water current
+            SpawnWaterCurrent(
+                handTrackingBrush.brush.position
             );
 
-        if (distance < minimumSpawnDistance)
+            hasSpawnedForCurrentIndex = true;
+
             return;
+        }
 
-        SpawnWaterCurrent(currentPosition);
-
-        lastSpawnPosition = currentPosition;
-
-        nextSpawnTime =
-            Time.time + spawnCooldown;
+        // --------------------------------
+        // INDEX RELEASED / NEUTRAL
+        // --------------------------------
+        // This arms the system for the next Index.
+        hasSpawnedForCurrentIndex = false;
     }
 
     void SpawnWaterCurrent(Vector3 position)
@@ -83,8 +61,8 @@ public class BrushTrail : MonoBehaviour
             return;
         }
 
-        // Random rotation gives the current
-        // a slightly organic appearance.
+        position.z = 0f;
+
         float rotation =
             Random.Range(
                 -randomRotation,
@@ -104,8 +82,11 @@ public class BrushTrail : MonoBehaviour
                 position,
                 rotationQuaternion
             );
+            if (ArtworkStatistics.Instance != null)
+            {
+                ArtworkStatistics.Instance.data.waterCount++;
+            }
 
-        // Slight size variation
         float scale =
             Random.Range(
                 randomScaleMin,

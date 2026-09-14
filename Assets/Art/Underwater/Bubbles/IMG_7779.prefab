@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 3049817366609114172}
   - component: {fileID: 1690849049448026436}
   - component: {fileID: 3660748223501494572}
+  - component: {fileID: -475591292751711498}
   m_Layer: 0
   m_Name: IMG_7779
   m_TagString: Untagged
@@ -104,3 +105,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 82227f438b4c6d44b83ef5dd14f62cd1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BubbleElement
+--- !u!114 &-475591292751711498
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6325246989441732650}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 05a6a4f062aa65840aa328e999e4853d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BubbleMovement
+  speed: 0.5
+  wobbleAmount: 0.08
+  wobbleSpeed: 2
+  lifetime: 8

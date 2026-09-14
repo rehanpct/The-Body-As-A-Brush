@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public class FistGesture : MonoBehaviour
+public class ThumbUpGesture : MonoBehaviour
 {
     [Header("Gesture Manager")]
     public GestureManager gestureManager;
@@ -11,17 +11,22 @@ public class FistGesture : MonoBehaviour
     [Header("Burst Settings")]
     public int bubbleCount = 3;
     public float burstRadius = 1.5f;
-    public float spawnCooldown = 1.5f;
 
-    private float nextSpawnTime = 0f;
-    private bool wasFist = false;
+    private bool hasSpawnedForCurrentThumb = false;
 
     void Start()
     {
         if (gestureManager == null)
         {
             Debug.LogError(
-                "FistGesture: GestureManager is not assigned!"
+                "ThumbUpGesture: GestureManager is not assigned!"
+            );
+        }
+
+        if (bubblePrefab == null)
+        {
+            Debug.LogError(
+                "ThumbUpGesture: Bubble Prefab is not assigned!"
             );
         }
     }
@@ -31,34 +36,37 @@ public class FistGesture : MonoBehaviour
         if (gestureManager == null)
             return;
 
-        bool isFist =
+        bool isThumbUp =
             gestureManager.CurrentGesture ==
-            GestureManager.Gesture.Fist;
+            GestureManager.Gesture.ThumbUp;
 
-        // Trigger only when entering Fist.
-        if (isFist && !wasFist)
+        // --------------------------------
+        // THUMB UP DETECTED
+        // --------------------------------
+        if (isThumbUp)
         {
-            if (Time.time >= nextSpawnTime)
-            {
-                SpawnBubbleBurst();
+            // Already spawned for this Thumb Up
+            if (hasSpawnedForCurrentThumb)
+                return;
 
-                nextSpawnTime =
-                    Time.time + spawnCooldown;
-            }
+            SpawnBubbleBurst();
+
+            hasSpawnedForCurrentThumb = true;
+
+            return;
         }
 
-        wasFist = isFist;
+        // --------------------------------
+        // THUMB UP RELEASED
+        // --------------------------------
+        // Allows the next Thumb Up to trigger.
+        hasSpawnedForCurrentThumb = false;
     }
 
     void SpawnBubbleBurst()
     {
         if (bubblePrefab == null)
-        {
-            Debug.LogError(
-                "FistGesture: Bubble prefab is not assigned!"
-            );
             return;
-        }
 
         HandTrackingBrush brush =
             FindFirstObjectByType<HandTrackingBrush>();
@@ -89,6 +97,12 @@ public class FistGesture : MonoBehaviour
                 spawnPosition,
                 Quaternion.identity
             );
+        }
+
+        // Count ONE bubble burst action
+        if (ArtworkStatistics.Instance != null)
+        {
+            ArtworkStatistics.Instance.data.bubbleBurstCount++;
         }
     }
 }

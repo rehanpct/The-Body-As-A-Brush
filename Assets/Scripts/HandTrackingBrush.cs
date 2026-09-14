@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using Mediapipe.Tasks.Vision.HandLandmarker;
 using Mediapipe.Unity.Sample.HandLandmarkDetection;
@@ -14,16 +15,43 @@ public class HandTrackingBrush : MonoBehaviour
     public Transform brush;
 
     [Header("Movement")]
-    public float smoothSpeed = 15f;
+    public float smoothSpeed = 18f;
+
+    [Header("Tracking Stability")]
+    [Tooltip(
+        "How long the last valid hand position " +
+        "is kept when MediaPipe briefly misses a frame."
+    )]
+    public float trackingGracePeriod = 0.15f;
+
+    [Tooltip(
+        "Maximum movement allowed between updates."
+    )]
+    public float maxMovementPerFrame = 2f;
 
     private float targetX;
     private float targetY;
 
-    private bool handDetected = false;
+    private bool receivedHand = false;
 
-    public bool IsHandDetected => handDetected;
+    private float lastValidHandTime = -999f;
 
-    // Water drawing is allowed ONLY during Index gesture.
+    private Vector3 targetWorldPosition;
+
+    private readonly object trackingLock =
+      new object();
+
+    public bool IsHandDetected
+    {
+        get
+        {
+            lock (trackingLock)
+            {
+                return receivedHand;
+            }
+        }
+    }
+
     public bool IsIndexDrawing =>
         gestureManager != null &&
         gestureManager.CurrentGesture ==
@@ -33,84 +61,212 @@ public class HandTrackingBrush : MonoBehaviour
     {
         if (handLandmarkerRunner != null)
         {
-            handLandmarkerRunner.OnResultUpdated += OnHandResult;
+            handLandmarkerRunner.OnResultUpdated +=
+              OnHandResult;
         }
         else
         {
             Debug.LogError(
-                "HandTrackingBrush: HandLandmarkerRunner is not assigned!"
-            );
-        }
-
-        if (brush == null)
-        {
-            Debug.LogError(
-                "HandTrackingBrush: Brush is not assigned!"
+              "HandTrackingBrush: " +
+              "HandLandmarkerRunner is not assigned!"
             );
         }
 
         if (gestureManager == null)
         {
             Debug.LogError(
-                "HandTrackingBrush: GestureManager is not assigned!"
+              "HandTrackingBrush: " +
+              "GestureManager is not assigned!"
+            );
+        }
+
+        if (brush == null)
+        {
+            Debug.LogError(
+              "HandTrackingBrush: " +
+              "Brush is not assigned!"
             );
         }
     }
 
-    void OnHandResult(HandLandmarkerResult result)
+    private void OnHandResult(
+      HandLandmarkerResult result
+    )
     {
-        if (result.handLandmarks == null ||
-            result.handLandmarks.Count == 0)
+        bool foundHand = false;
+
+        float newX = 0f;
+        float newY = 0f;
+
+        if (
+          result.handLandmarks != null &&
+          result.handLandmarks.Count > 0
+        )
         {
-            handDetected = false;
-            return;
+            var hand =
+              result.handLandmarks[0];
+
+            if (
+              hand.landmarks != null &&
+              hand.landmarks.Count >= 21
+            )
+            {
+                var indexTip =
+                  hand.landmarks[8];
+
+                newX = Mathf.Clamp01(
+                  indexTip.x
+                );
+
+                newY = Mathf.Clamp01(
+                  1f - indexTip.y
+                );
+
+                foundHand = true;
+            }
         }
 
-        var hand = result.handLandmarks[0];
-
-        if (hand.landmarks == null ||
-            hand.landmarks.Count < 21)
+        lock (trackingLock)
         {
-            handDetected = false;
-            return;
+            if (foundHand)
+            {
+                targetX = newX;
+                targetY = newY;
+
+                receivedHand = true;
+
+                /*
+                 * We cannot use Time.time here because
+                 * this callback may be running on a
+                 * MediaPipe worker thread.
+                 */
+            }
+            else
+            {
+                receivedHand = false;
+            }
         }
-
-        var indexTip = hand.landmarks[8];
-
-        targetX = indexTip.x;
-        targetY = 1f - indexTip.y;
-
-        handDetected = true;
     }
 
     void Update()
     {
-        if (!handDetected || brush == null)
+        if (brush == null)
             return;
 
-        Camera mainCamera = Camera.main;
+        float x;
+        float y;
+        bool hasHand;
+
+        lock (trackingLock)
+        {
+            x = targetX;
+            y = targetY;
+            hasHand = receivedHand;
+        }
+
+        /*
+         * Use Unity's main-thread time here.
+         */
+        if (hasHand)
+        {
+            lastValidHandTime =
+              Time.realtimeSinceStartup;
+
+            CalculateTargetWorldPosition(
+              x,
+              y
+            );
+
+            MoveBrush();
+        }
+        else
+        {
+            /*
+             * Do NOT immediately remove the hand.
+             *
+             * MediaPipe can miss a single frame.
+             * Keep the brush where it was briefly.
+             */
+            float timeSinceLastHand =
+              Time.realtimeSinceStartup -
+              lastValidHandTime;
+
+            if (
+              timeSinceLastHand <=
+              trackingGracePeriod
+            )
+            {
+                MoveBrush();
+            }
+        }
+    }
+
+    private void CalculateTargetWorldPosition(
+      float normalizedX,
+      float normalizedY
+    )
+    {
+        Camera mainCamera =
+          Camera.main;
 
         if (mainCamera == null)
             return;
 
-        Vector3 screenPosition = new Vector3(
-            targetX * Screen.width,
-            targetY * Screen.height,
+        Vector3 screenPosition =
+          new Vector3(
+            normalizedX * Screen.width,
+            normalizedY * Screen.height,
             10f
-        );
+          );
 
-        Vector3 worldPosition =
-            mainCamera.ScreenToWorldPoint(
-                screenPosition
-            );
+        targetWorldPosition =
+          mainCamera.ScreenToWorldPoint(
+            screenPosition
+          );
 
-        worldPosition.z = 0f;
+        targetWorldPosition.z = 0f;
+    }
 
-        brush.position = Vector3.Lerp(
-            brush.position,
-            worldPosition,
-            smoothSpeed * Time.deltaTime
-        );
+    private void MoveBrush()
+    {
+        Vector3 currentPosition =
+          brush.position;
+
+        Vector3 difference =
+          targetWorldPosition -
+          currentPosition;
+
+        /*
+         * Prevent one bad MediaPipe coordinate
+         * from teleporting the brush.
+         */
+        if (
+          difference.magnitude >
+          maxMovementPerFrame
+        )
+        {
+            difference =
+              difference.normalized *
+              maxMovementPerFrame;
+        }
+
+        Vector3 limitedTarget =
+          currentPosition +
+          difference;
+
+        float interpolation =
+          1f -
+          Mathf.Exp(
+            -smoothSpeed *
+            Time.deltaTime
+          );
+
+        brush.position =
+          Vector3.Lerp(
+            currentPosition,
+            limitedTarget,
+            interpolation
+          );
     }
 
     void OnDestroy()
@@ -118,7 +274,7 @@ public class HandTrackingBrush : MonoBehaviour
         if (handLandmarkerRunner != null)
         {
             handLandmarkerRunner.OnResultUpdated -=
-                OnHandResult;
+              OnHandResult;
         }
     }
 }

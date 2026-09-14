@@ -1,23 +1,94 @@
 using UnityEngine;
 
-public class FishElement : MonoBehaviour
+public class FistGesture : MonoBehaviour
 {
+    [Header("Gesture Manager")]
+    public GestureManager gestureManager;
+
+    [Header("Bubble")]
+    public GameObject bubblePrefab;
+
+    [Header("Burst Settings")]
+    public int bubbleCount = 3;
+    public float burstRadius = 1.5f;
+    public float spawnCooldown = 1.5f;
+
+    private float nextSpawnTime = 0f;
+    private bool wasThumbUp = false;
+
     void Start()
     {
-        // Slight size variation
-        float randomSize = Random.Range(0.8f, 1.2f);
-
-        transform.localScale *= randomSize;
-
-        // Fish should remain mostly horizontal.
-        // Only a small rotation variation.
-        float randomRotation = Random.Range(-15f, 15f);
-
-        transform.rotation =
-            Quaternion.Euler(
-                0f,
-                0f,
-                randomRotation
+        if (gestureManager == null)
+        {
+            Debug.LogError(
+                "FistGesture: GestureManager is not assigned!"
             );
+        }
+    }
+
+    void Update()
+    {
+        if (gestureManager == null)
+            return;
+
+        bool isThumbUp =
+            gestureManager.CurrentGesture ==
+            GestureManager.Gesture.ThumbUp;
+
+        // Spawn only once when Thumb Up starts.
+        if (isThumbUp && !wasThumbUp)
+        {
+            if (Time.time >= nextSpawnTime)
+            {
+                SpawnBubbleBurst();
+
+                nextSpawnTime =
+                    Time.time + spawnCooldown;
+            }
+        }
+
+        wasThumbUp = isThumbUp;
+    }
+
+    void SpawnBubbleBurst()
+    {
+        if (bubblePrefab == null)
+        {
+            Debug.LogError(
+                "FistGesture: Bubble prefab is not assigned!"
+            );
+            return;
+        }
+
+        HandTrackingBrush brush =
+            FindFirstObjectByType<HandTrackingBrush>();
+
+        if (brush == null || brush.brush == null)
+            return;
+
+        Vector3 centerPosition =
+            brush.brush.position;
+
+        centerPosition.z = 0f;
+
+        for (int i = 0; i < bubbleCount; i++)
+        {
+            Vector2 randomOffset =
+                Random.insideUnitCircle * burstRadius;
+
+            Vector3 spawnPosition =
+                centerPosition +
+                new Vector3(
+                    randomOffset.x,
+                    randomOffset.y,
+                    0f
+                );
+
+            Instantiate(
+                bubblePrefab,
+                spawnPosition,
+                Quaternion.identity
+            );
+        }
     }
 }

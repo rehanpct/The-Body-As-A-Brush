@@ -10,7 +10,7 @@ public class GestureManager : MonoBehaviour
         Index,
         OpenPalm,
         VSign,
-        Fist
+        ThumbUp
     }
 
     [Header("MediaPipe")]
@@ -25,14 +25,13 @@ public class GestureManager : MonoBehaviour
     [Header("Stability")]
     public float gestureHoldTime = 0.20f;
 
-    // Data received from MediaPipe thread
     private Gesture detectedGesture = Gesture.Neutral;
 
-    // Main-thread state
     private Gesture candidateGesture = Gesture.Neutral;
     private float candidateStartTime = 0f;
 
     private readonly object gestureLock = new object();
+
 
     void Start()
     {
@@ -48,9 +47,11 @@ public class GestureManager : MonoBehaviour
         }
     }
 
-    // IMPORTANT:
-    // This callback may run on a background thread.
-    // Do NOT use Unity API here.
+
+    // =========================================================
+    // MEDIAPIPE CALLBACK
+    // =========================================================
+
     void OnHandResult(HandLandmarkerResult result)
     {
         Gesture newGesture = Gesture.Neutral;
@@ -73,8 +74,11 @@ public class GestureManager : MonoBehaviour
         }
     }
 
-    // Everything involving Time.time happens here,
-    // on Unity's main thread.
+
+    // =========================================================
+    // MAIN UNITY THREAD
+    // =========================================================
+
     void Update()
     {
         Gesture newDetectedGesture;
@@ -84,7 +88,6 @@ public class GestureManager : MonoBehaviour
             newDetectedGesture = detectedGesture;
         }
 
-        // Same candidate
         if (newDetectedGesture == candidateGesture)
         {
             if (Time.time - candidateStartTime >= gestureHoldTime)
@@ -95,105 +98,218 @@ public class GestureManager : MonoBehaviour
             return;
         }
 
-        // New candidate
         candidateGesture = newDetectedGesture;
         candidateStartTime = Time.time;
     }
 
+
+    // =========================================================
+    // DISTANCE HELPER
+    // =========================================================
+
+    float Distance(
+        Mediapipe.Tasks.Components.Containers.NormalizedLandmark a,
+        Mediapipe.Tasks.Components.Containers.NormalizedLandmark b)
+    {
+        float dx = a.x - b.x;
+        float dy = a.y - b.y;
+
+        return Mathf.Sqrt(
+            dx * dx +
+            dy * dy
+        );
+    }
+
+
+    // =========================================================
+    // GESTURE DETECTION
+    // =========================================================
+
     Gesture DetectGesture(
-    Mediapipe.Tasks.Components.Containers.NormalizedLandmarks hand)
-{
-    // Finger state based on tip vs PIP joint.
-    // This is more reliable for our front-facing webcam setup.
-
-    bool indexOpen =
-        hand.landmarks[8].y <
-        hand.landmarks[6].y - 0.02f;
-
-    bool middleOpen =
-        hand.landmarks[12].y <
-        hand.landmarks[10].y - 0.02f;
-
-    bool ringOpen =
-        hand.landmarks[16].y <
-        hand.landmarks[14].y - 0.02f;
-
-    bool pinkyOpen =
-        hand.landmarks[20].y <
-        hand.landmarks[18].y - 0.02f;
-
-    bool indexClosed =
-        hand.landmarks[8].y >
-        hand.landmarks[6].y + 0.01f;
-
-    bool middleClosed =
-        hand.landmarks[12].y >
-        hand.landmarks[10].y + 0.01f;
-
-    bool ringClosed =
-        hand.landmarks[16].y >
-        hand.landmarks[14].y + 0.01f;
-
-    bool pinkyClosed =
-        hand.landmarks[20].y >
-        hand.landmarks[18].y + 0.01f;
-
-
-    // -------------------------
-    // FIST
-    // -------------------------
-    if (indexClosed &&
-        middleClosed &&
-        ringClosed &&
-        pinkyClosed)
+        Mediapipe.Tasks.Components.Containers.NormalizedLandmarks hand)
     {
-        return Gesture.Fist;
+        // -----------------------------------------------------
+        // IMPORTANT LANDMARKS
+        // -----------------------------------------------------
+        //
+        // 0  = Wrist
+        //
+        // Index:
+        // 6  = PIP
+        // 8  = Tip
+        //
+        // Middle:
+        // 10 = PIP
+        // 12 = Tip
+        //
+        // Ring:
+        // 14 = PIP
+        // 16 = Tip
+        //
+        // Pinky:
+        // 18 = PIP
+        // 20 = Tip
+        //
+        // Thumb:
+        // 2 = MCP
+        // 3 = IP
+        // 4 = Tip
+        // -----------------------------------------------------
+
+
+        var wrist = hand.landmarks[0];
+
+
+        // =====================================================
+        // FINGER OPEN/CLOSED
+        // =====================================================
+
+        float openMargin = 0.02f;
+
+        bool indexOpen =
+            hand.landmarks[8].y <
+            hand.landmarks[6].y - openMargin;
+
+        bool middleOpen =
+            hand.landmarks[12].y <
+            hand.landmarks[10].y - openMargin;
+
+        bool ringOpen =
+            hand.landmarks[16].y <
+            hand.landmarks[14].y - openMargin;
+
+        bool pinkyOpen =
+            hand.landmarks[20].y <
+            hand.landmarks[18].y - openMargin;
+
+
+        // =====================================================
+        // CLOSED FINGERS
+        // =====================================================
+        //
+        // Instead of relying only on Y position,
+        // compare fingertip distance to the wrist.
+        // A curled finger brings its tip closer to the palm.
+        // =====================================================
+
+        bool indexClosed =
+            Distance(hand.landmarks[8], wrist) <
+            Distance(hand.landmarks[6], wrist) * 1.10f;
+
+        bool middleClosed =
+            Distance(hand.landmarks[12], wrist) <
+            Distance(hand.landmarks[10], wrist) * 1.10f;
+
+        bool ringClosed =
+            Distance(hand.landmarks[16], wrist) <
+            Distance(hand.landmarks[14], wrist) * 1.10f;
+
+        bool pinkyClosed =
+            Distance(hand.landmarks[20], wrist) <
+            Distance(hand.landmarks[18], wrist) * 1.10f;
+
+
+        // =====================================================
+        // 👍 THUMB UP
+        // =====================================================
+
+        // Thumb tip must be clearly extended away from
+        // the thumb base.
+
+        float thumbTipDistance =
+            Distance(hand.landmarks[4], wrist);
+
+        float thumbBaseDistance =
+            Distance(hand.landmarks[2], wrist);
+
+        bool thumbExtended =
+            thumbTipDistance >
+            thumbBaseDistance * 1.25f;
+
+
+        // Thumb tip should also be clearly above the palm.
+
+        bool thumbAbovePalm =
+            hand.landmarks[4].y <
+            hand.landmarks[9].y - 0.02f;
+
+
+        bool thumbUp =
+            thumbExtended &&
+            thumbAbovePalm &&
+            indexClosed &&
+            middleClosed &&
+            ringClosed &&
+            pinkyClosed;
+
+
+        // =====================================================
+        // 👍 THUMB UP
+        // =====================================================
+
+        if (thumbUp)
+        {
+            return Gesture.ThumbUp;
+        }
+
+
+        // =====================================================
+        // ✌️ V SIGN
+        // =====================================================
+
+        if (indexOpen &&
+            middleOpen &&
+            ringClosed &&
+            pinkyClosed)
+        {
+            return Gesture.VSign;
+        }
+
+
+        // =====================================================
+        // ✋ OPEN PALM
+        // =====================================================
+
+        if (indexOpen &&
+            middleOpen &&
+            ringOpen &&
+            pinkyOpen)
+        {
+            return Gesture.OpenPalm;
+        }
+
+
+        // =====================================================
+        // ☝️ INDEX
+        // =====================================================
+
+        if (indexOpen &&
+            middleClosed &&
+            ringClosed &&
+            pinkyClosed)
+        {
+            return Gesture.Index;
+        }
+
+
+        // =====================================================
+        // NEUTRAL
+        // =====================================================
+
+        return Gesture.Neutral;
     }
 
 
-    // -------------------------
-    // V SIGN
-    // -------------------------
-    // Index + middle clearly open.
-    // Ring + pinky clearly closed.
-    if (indexOpen &&
-        middleOpen &&
-        ringClosed &&
-        pinkyClosed)
+    // =========================================================
+    // CLEANUP
+    // =========================================================
+
+    void OnDestroy()
     {
-        return Gesture.VSign;
+        if (handLandmarkerRunner != null)
+        {
+            handLandmarkerRunner.OnResultUpdated -=
+                OnHandResult;
+        }
     }
-
-
-    // -------------------------
-    // OPEN PALM
-    // -------------------------
-    if (indexOpen &&
-        middleOpen &&
-        ringOpen &&
-        pinkyOpen)
-    {
-        return Gesture.OpenPalm;
-    }
-
-
-    // -------------------------
-    // INDEX FINGER
-    // -------------------------
-    // ONLY index open.
-    // All other fingers must be clearly closed.
-    if (indexOpen &&
-        middleClosed &&
-        ringClosed &&
-        pinkyClosed)
-    {
-        return Gesture.Index;
-    }
-
-
-    // -------------------------
-    // EVERYTHING ELSE
-    // -------------------------
-    return Gesture.Neutral;
-}
 }
