@@ -5,16 +5,19 @@ public class BrushTrail : MonoBehaviour
     [Header("Hand Tracking")]
     public HandTrackingBrush handTrackingBrush;
 
-    [Header("Water Current")]
+    [Header("Water Current - Underwater")]
     public GameObject waterCurrentPrefab;
+
+    [Header("Golden Light Trail - Taiwan")]
+    public GameObject goldenLightTrailPrefab;
 
     [Header("Spawn Settings")]
     public float randomRotation = 8f;
     public float randomScaleMin = 0.85f;
     public float randomScaleMax = 1.15f;
 
-    // Prevents continuous spawning while Index is held
-    private bool hasSpawnedForCurrentIndex = false;
+    private bool hasSpawnedForCurrentIndex =
+        false;
 
     void Update()
     {
@@ -24,38 +27,60 @@ public class BrushTrail : MonoBehaviour
         bool isIndex =
             handTrackingBrush.IsIndexDrawing;
 
-        // --------------------------------
-        // INDEX STARTED
-        // --------------------------------
         if (isIndex)
         {
-            // Already spawned for this Index gesture
             if (hasSpawnedForCurrentIndex)
                 return;
 
-            // Spawn exactly ONE water current
-            SpawnWaterCurrent(
+            SpawnThemeTrail(
                 handTrackingBrush.brush.position
             );
 
-            hasSpawnedForCurrentIndex = true;
+            hasSpawnedForCurrentIndex =
+                true;
 
             return;
         }
 
-        // --------------------------------
-        // INDEX RELEASED / NEUTRAL
-        // --------------------------------
-        // This arms the system for the next Index.
-        hasSpawnedForCurrentIndex = false;
+        hasSpawnedForCurrentIndex =
+            false;
     }
 
-    void SpawnWaterCurrent(Vector3 position)
+    void SpawnThemeTrail(
+        Vector3 position)
+    {
+        if (ThemeManager.Instance == null)
+        {
+            Debug.LogError(
+                "BrushTrail: ThemeManager " +
+                "is missing!"
+            );
+
+            return;
+        }
+
+        if (ThemeManager.Instance.IsTaiwan())
+        {
+            SpawnGoldenLightTrail(position);
+        }
+        else
+        {
+            SpawnWaterCurrent(position);
+        }
+    }
+
+    // =====================================================
+    // UNDERWATER
+    // =====================================================
+
+    void SpawnWaterCurrent(
+        Vector3 position)
     {
         if (waterCurrentPrefab == null)
         {
             Debug.LogError(
-                "BrushTrail: Water Current Prefab is not assigned!"
+                "BrushTrail: Water Current Prefab " +
+                "is not assigned!"
             );
 
             return;
@@ -82,10 +107,9 @@ public class BrushTrail : MonoBehaviour
                 position,
                 rotationQuaternion
             );
-            if (ArtworkStatistics.Instance != null)
-            {
-                ArtworkStatistics.Instance.data.waterCount++;
-            }
+
+        current.tag =
+            "ArtworkElement";
 
         float scale =
             Random.Range(
@@ -93,6 +117,85 @@ public class BrushTrail : MonoBehaviour
                 randomScaleMax
             );
 
-        current.transform.localScale *= scale;
+        current.transform.localScale *=
+            scale;
+
+        if (ArtworkStatistics.Instance != null)
+        {
+            ArtworkStatistics.Instance
+                .data.waterCount++;
+        }
+
+        if (ArtworkActionHistory.Instance != null)
+        {
+            ArtworkActionHistory.Instance
+                .RegisterAction(current);
+        }
+
+        Debug.Log(
+            "🌊 Water current created."
+        );
+    }
+
+    // =====================================================
+    // TAIWAN
+    // =====================================================
+
+    void SpawnGoldenLightTrail(
+        Vector3 position)
+    {
+        if (goldenLightTrailPrefab == null)
+        {
+            Debug.LogError(
+                "BrushTrail: Golden Light Trail " +
+                "Prefab is not assigned!"
+            );
+
+            return;
+        }
+
+        position.z = 0f;
+
+        float rotation =
+            Random.Range(
+                -randomRotation,
+                randomRotation
+            );
+
+        Quaternion rotationQuaternion =
+            Quaternion.Euler(
+                0f,
+                0f,
+                rotation
+            );
+
+        GameObject trail =
+            Instantiate(
+                goldenLightTrailPrefab,
+                position,
+                rotationQuaternion
+            );
+
+        trail.tag =
+            "ArtworkElement";
+
+        float scale =
+            Random.Range(
+                randomScaleMin,
+                randomScaleMax
+            );
+
+        trail.transform.localScale *=
+            scale;
+
+        if (ArtworkActionHistory.Instance != null)
+        {
+            ArtworkActionHistory.Instance
+                .RegisterAction(trail);
+        }
+
+        Debug.Log(
+            "✨ Golden light trail created."
+        );
     }
 }

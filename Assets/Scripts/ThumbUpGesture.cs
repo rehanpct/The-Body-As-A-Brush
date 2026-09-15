@@ -5,31 +5,71 @@ public class ThumbUpGesture : MonoBehaviour
     [Header("Gesture Manager")]
     public GestureManager gestureManager;
 
-    [Header("Bubble")]
+    // =========================================================
+    // UNDERWATER
+    // =========================================================
+
+    [Header("Bubble - Underwater")]
     public GameObject bubblePrefab;
 
-    [Header("Burst Settings")]
+    [Header("Bubble Burst Settings")]
     public int bubbleCount = 3;
+
     public float burstRadius = 1.5f;
 
-    private bool hasSpawnedForCurrentThumb = false;
+    // =========================================================
+    // TAIWAN
+    // =========================================================
+
+    [Header("Fireworks - Taiwan")]
+    public GameObject fireworksPrefab;
+
+    [Header("Fireworks Settings")]
+    public float fireworksScale = 1f;
+
+    // =========================================================
+    // STATE
+    // =========================================================
+
+    private bool hasSpawnedForCurrentThumb =
+        false;
+
+    // =========================================================
+    // START
+    // =========================================================
 
     void Start()
     {
         if (gestureManager == null)
         {
             Debug.LogError(
-                "ThumbUpGesture: GestureManager is not assigned!"
+                "ThumbUpGesture: " +
+                "GestureManager is not assigned!"
             );
         }
 
         if (bubblePrefab == null)
         {
-            Debug.LogError(
-                "ThumbUpGesture: Bubble Prefab is not assigned!"
+            Debug.LogWarning(
+                "ThumbUpGesture: " +
+                "Bubble Prefab is not assigned. " +
+                "This is okay if using Taiwan theme."
+            );
+        }
+
+        if (fireworksPrefab == null)
+        {
+            Debug.LogWarning(
+                "ThumbUpGesture: " +
+                "Fireworks Prefab is not assigned. " +
+                "This is okay if using Underwater theme."
             );
         }
     }
+
+    // =========================================================
+    // UPDATE
+    // =========================================================
 
     void Update()
     {
@@ -40,49 +80,109 @@ public class ThumbUpGesture : MonoBehaviour
             gestureManager.CurrentGesture ==
             GestureManager.Gesture.ThumbUp;
 
-        // --------------------------------
-        // THUMB UP DETECTED
-        // --------------------------------
         if (isThumbUp)
         {
-            // Already spawned for this Thumb Up
             if (hasSpawnedForCurrentThumb)
                 return;
 
-            SpawnBubbleBurst();
+            SpawnThemeEffect();
 
-            hasSpawnedForCurrentThumb = true;
+            hasSpawnedForCurrentThumb =
+                true;
 
             return;
         }
 
-        // --------------------------------
-        // THUMB UP RELEASED
-        // --------------------------------
-        // Allows the next Thumb Up to trigger.
-        hasSpawnedForCurrentThumb = false;
+        hasSpawnedForCurrentThumb =
+            false;
     }
+
+    // =========================================================
+    // THEME SELECTION
+    // =========================================================
+
+    void SpawnThemeEffect()
+    {
+        if (ThemeManager.Instance == null)
+        {
+            Debug.LogError(
+                "ThumbUpGesture: " +
+                "ThemeManager is missing!"
+            );
+
+            return;
+        }
+
+        if (ThemeManager.Instance.IsTaiwan())
+        {
+            SpawnFireworks();
+        }
+        else
+        {
+            SpawnBubbleBurst();
+        }
+    }
+
+    // =========================================================
+    // UNDERWATER - BUBBLE BURST
+    // =========================================================
 
     void SpawnBubbleBurst()
     {
         if (bubblePrefab == null)
+        {
+            Debug.LogError(
+                "ThumbUpGesture: " +
+                "Bubble Prefab is not assigned!"
+            );
+
             return;
+        }
 
         HandTrackingBrush brush =
-            FindFirstObjectByType<HandTrackingBrush>();
+            FindFirstObjectByType<
+                HandTrackingBrush>();
 
-        if (brush == null || brush.brush == null)
+        if (brush == null ||
+            brush.brush == null)
+        {
             return;
+        }
 
         Vector3 centerPosition =
             brush.brush.position;
 
         centerPosition.z = 0f;
 
-        for (int i = 0; i < bubbleCount; i++)
+        // =====================================================
+        // CREATE BURST ROOT
+        // =====================================================
+
+        GameObject bubbleBurst =
+            new GameObject(
+                "BubbleBurst"
+            );
+
+        bubbleBurst.transform.position =
+            centerPosition;
+
+        bubbleBurst.transform.rotation =
+            Quaternion.identity;
+
+        bubbleBurst.tag =
+            "ArtworkElement";
+
+        // =====================================================
+        // CREATE BUBBLES
+        // =====================================================
+
+        for (int i = 0;
+             i < bubbleCount;
+             i++)
         {
             Vector2 randomOffset =
-                Random.insideUnitCircle * burstRadius;
+                Random.insideUnitCircle *
+                burstRadius;
 
             Vector3 spawnPosition =
                 centerPosition +
@@ -92,17 +192,109 @@ public class ThumbUpGesture : MonoBehaviour
                     0f
                 );
 
+            GameObject bubble =
+                Instantiate(
+                    bubblePrefab,
+                    spawnPosition,
+                    Quaternion.identity,
+                    bubbleBurst.transform
+                );
+
+            // Only the root is selectable.
+            bubble.tag =
+                "Untagged";
+        }
+
+        // =====================================================
+        // STATISTICS
+        // =====================================================
+
+        if (ArtworkStatistics.Instance != null)
+        {
+            ArtworkStatistics.Instance
+                .data.bubbleBurstCount++;
+        }
+
+        // =====================================================
+        // UNDO
+        // =====================================================
+
+        if (ArtworkActionHistory.Instance != null)
+        {
+            ArtworkActionHistory.Instance
+                .RegisterAction(
+                    bubbleBurst
+                );
+        }
+
+        Debug.Log(
+            "🫧 Bubble burst created: " +
+            bubbleCount +
+            " bubbles."
+        );
+    }
+
+    // =========================================================
+    // TAIWAN - FIREWORKS
+    // =========================================================
+
+    void SpawnFireworks()
+    {
+        if (fireworksPrefab == null)
+        {
+            Debug.LogError(
+                "ThumbUpGesture: " +
+                "Fireworks Prefab is not assigned!"
+            );
+
+            return;
+        }
+
+        HandTrackingBrush brush =
+            FindFirstObjectByType<
+                HandTrackingBrush>();
+
+        if (brush == null ||
+            brush.brush == null)
+        {
+            return;
+        }
+
+        Vector3 spawnPosition =
+            brush.brush.position;
+
+        spawnPosition.z = 0f;
+
+        GameObject fireworks =
             Instantiate(
-                bubblePrefab,
+                fireworksPrefab,
                 spawnPosition,
                 Quaternion.identity
             );
+
+        fireworks.name =
+            "FireworksBurst";
+
+        fireworks.tag =
+            "ArtworkElement";
+
+        fireworks.transform.localScale *=
+            fireworksScale;
+
+        // =====================================================
+        // UNDO
+        // =====================================================
+
+        if (ArtworkActionHistory.Instance != null)
+        {
+            ArtworkActionHistory.Instance
+                .RegisterAction(
+                    fireworks
+                );
         }
 
-        // Count ONE bubble burst action
-        if (ArtworkStatistics.Instance != null)
-        {
-            ArtworkStatistics.Instance.data.bubbleBurstCount++;
-        }
+        Debug.Log(
+            "🎆 Taiwan fireworks burst created."
+        );
     }
 }

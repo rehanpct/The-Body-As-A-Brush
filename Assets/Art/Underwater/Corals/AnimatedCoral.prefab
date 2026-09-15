@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 7494755571910332042}
   m_Layer: 0
   m_Name: AnimatedCoral
-  m_TagString: Untagged
+  m_TagString: ArtworkElement
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -51,12 +51,12 @@ MonoBehaviour:
   leftPart: {fileID: 675084858381716777}
   centerPart: {fileID: 382499216868195284}
   rightPart: {fileID: 5030355598668556917}
-  leftAngle: 6
-  centerAngle: 2.5
-  rightAngle: 6
-  leftSpeed: 1
-  centerSpeed: 0.9
-  rightSpeed: 1.1
+  leftAngle: 10
+  centerAngle: 3
+  rightAngle: 10
+  leftSpeed: 2
+  centerSpeed: 1
+  rightSpeed: 2
 --- !u!1 &2805141303098984373
 GameObject:
   m_ObjectHideFlags: 0

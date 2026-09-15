@@ -22,22 +22,138 @@ public class GestureManager : MonoBehaviour
 
     public Gesture CurrentGesture => currentGesture;
 
-    [Header("Stability")]
+    [Header("Gesture Stability")]
     public float gestureHoldTime = 0.20f;
+
+    [Header("⭕ Circle / Undo")]
+    public float circleDistanceThreshold = 0.065f;
+    public float circleHoldTime = 0.20f;
+
+    [Header("🤏 Pinch / Move")]
+    public float pinchDistanceThreshold = 0.14f;
+    public float pinchHoldTime = 0.15f;
+
+    [Header("🤏🤏 Two-Hand Scale")]
+    public float twoHandPinchDistanceThreshold = 0.14f;
+    public float twoHandScaleSensitivity = 1.5f;
 
     private Gesture detectedGesture = Gesture.Neutral;
 
     private Gesture candidateGesture = Gesture.Neutral;
     private float candidateStartTime = 0f;
 
-    private readonly object gestureLock = new object();
+    private bool detectedCircle = false;
+    private bool detectedPinch = false;
 
+    private float detectedPinchDistance = 0f;
+
+    private bool detectedBothHands = false;
+    private bool detectedTwoHandPinch = false;
+    private float detectedTwoHandDistance = 0f;
+
+    private bool circleStable = false;
+    private float circleStartTime = 0f;
+
+    private bool pinchStable = false;
+    private float pinchStartTime = 0f;
+
+    private bool twoHandPinchStable = false;
+
+    private bool undoTriggered = false;
+
+    private readonly object gestureLock =
+        new object();
+
+    // =========================================================
+    // PUBLIC PINCH
+    // =========================================================
+
+    public bool IsPinching
+    {
+        get
+        {
+            lock (gestureLock)
+            {
+                return pinchStable;
+            }
+        }
+    }
+
+    public float PinchDistance
+    {
+        get
+        {
+            lock (gestureLock)
+            {
+                return detectedPinchDistance;
+            }
+        }
+    }
+
+    // =========================================================
+    // PUBLIC TWO-HAND SCALING
+    // =========================================================
+
+    public bool BothHandsDetected
+    {
+        get
+        {
+            lock (gestureLock)
+            {
+                return detectedBothHands;
+            }
+        }
+    }
+
+    public bool IsTwoHandPinching
+    {
+        get
+        {
+            lock (gestureLock)
+            {
+                return twoHandPinchStable;
+            }
+        }
+    }
+
+    public float TwoHandDistance
+    {
+        get
+        {
+            lock (gestureLock)
+            {
+                return detectedTwoHandDistance;
+            }
+        }
+    }
+
+    // =========================================================
+    // UNDO
+    // =========================================================
+
+    public bool ConsumeUndoTrigger()
+    {
+        lock (gestureLock)
+        {
+            if (!undoTriggered)
+                return false;
+
+            undoTriggered = false;
+
+            return true;
+        }
+    }
+
+    // =========================================================
+    // START
+    // =========================================================
 
     void Start()
     {
         if (handLandmarkerRunner != null)
         {
-            handLandmarkerRunner.OnResultUpdated += OnHandResult;
+            handLandmarkerRunner.OnResultUpdated +=
+                OnHandResult;
         }
         else
         {
@@ -47,72 +163,339 @@ public class GestureManager : MonoBehaviour
         }
     }
 
-
     // =========================================================
     // MEDIAPIPE CALLBACK
     // =========================================================
 
-    void OnHandResult(HandLandmarkerResult result)
+    void OnHandResult(
+        HandLandmarkerResult result)
     {
-        Gesture newGesture = Gesture.Neutral;
+        Gesture newGesture =
+            Gesture.Neutral;
+
+        bool newCircle = false;
+        bool newPinch = false;
+
+        float newPinchDistance = 0f;
+
+        bool newBothHands = false;
+        bool newTwoHandPinch = false;
+        float newTwoHandDistance = 0f;
 
         if (result.handLandmarks != null &&
             result.handLandmarks.Count > 0)
         {
-            var hand = result.handLandmarks[0];
+            var hand =
+                result.handLandmarks[0];
 
             if (hand.landmarks != null &&
                 hand.landmarks.Count >= 21)
             {
-                newGesture = DetectGesture(hand);
+                newPinch =
+                    DetectPinch(
+                        hand,
+                        out newPinchDistance
+                    );
+
+                if (!newPinch)
+                {
+                    newCircle =
+                        DetectCircle(hand);
+                }
+
+                newGesture =
+                    DetectGesture(hand);
+            }
+
+            // =================================================
+            // SECOND HAND
+            // =================================================
+
+            if (result.handLandmarks.Count >= 2)
+            {
+                var hand2 =
+                    result.handLandmarks[1];
+
+                if (hand2.landmarks != null &&
+                    hand2.landmarks.Count >= 21)
+                {
+                    var hand1 =
+                        result.handLandmarks[0];
+
+                    Vector2 palm1 =
+                        GetPalmCenter(hand1);
+
+                    Vector2 palm2 =
+                        GetPalmCenter(hand2);
+
+                    newTwoHandDistance =
+                        Vector2.Distance(
+                            palm1,
+                            palm2
+                        );
+
+                    newBothHands = true;
+
+                    bool firstHandPinch =
+                        DetectPinch(
+                            hand1,
+                            out _
+                        );
+
+                    bool secondHandPinch =
+                        DetectPinch(
+                            hand2,
+                            out _
+                        );
+
+                    newTwoHandPinch =
+                        firstHandPinch &&
+                        secondHandPinch;
+                }
             }
         }
 
         lock (gestureLock)
         {
-            detectedGesture = newGesture;
+            detectedGesture =
+                newGesture;
+
+            detectedCircle =
+                newCircle;
+
+            detectedPinch =
+                newPinch;
+
+            detectedPinchDistance =
+                newPinchDistance;
+
+            detectedBothHands =
+                newBothHands;
+
+            detectedTwoHandPinch =
+                newTwoHandPinch;
+
+            detectedTwoHandDistance =
+                newTwoHandDistance;
         }
     }
 
-
     // =========================================================
-    // MAIN UNITY THREAD
+    // UPDATE
     // =========================================================
 
     void Update()
     {
         Gesture newDetectedGesture;
+        bool circle;
+        bool pinch;
+        bool bothHands;
+        bool twoHandPinch;
 
         lock (gestureLock)
         {
-            newDetectedGesture = detectedGesture;
+            newDetectedGesture =
+                detectedGesture;
+
+            circle =
+                detectedCircle;
+
+            pinch =
+                detectedPinch;
+
+            bothHands =
+                detectedBothHands;
+
+            twoHandPinch =
+                detectedTwoHandPinch;
         }
 
-        if (newDetectedGesture == candidateGesture)
+        // =====================================================
+        // NORMAL GESTURE STABILITY
+        // =====================================================
+
+        if (newDetectedGesture ==
+            candidateGesture)
         {
-            if (Time.time - candidateStartTime >= gestureHoldTime)
+            if (Time.time -
+                candidateStartTime >=
+                gestureHoldTime)
             {
-                currentGesture = candidateGesture;
+                currentGesture =
+                    candidateGesture;
+            }
+        }
+        else
+        {
+            candidateGesture =
+                newDetectedGesture;
+
+            candidateStartTime =
+                Time.time;
+        }
+
+        // =====================================================
+        // CIRCLE / UNDO
+        // =====================================================
+
+        if (pinch ||
+            twoHandPinch)
+        {
+            circleStartTime = 0f;
+            circleStable = false;
+        }
+        else if (circle)
+        {
+            if (!circleStable)
+            {
+                if (circleStartTime == 0f)
+                {
+                    circleStartTime =
+                        Time.time;
+                }
+
+                if (Time.time -
+                    circleStartTime >=
+                    circleHoldTime)
+                {
+                    circleStable = true;
+
+                    lock (gestureLock)
+                    {
+                        undoTriggered = true;
+                    }
+
+                    Debug.Log(
+                        "⭕ Undo gesture triggered."
+                    );
+                }
+            }
+        }
+        else
+        {
+            circleStartTime = 0f;
+            circleStable = false;
+        }
+
+        // =====================================================
+        // ONE-HAND PINCH
+        // =====================================================
+
+        if (pinch)
+        {
+            if (!pinchStable)
+            {
+                if (pinchStartTime == 0f)
+                {
+                    pinchStartTime =
+                        Time.time;
+                }
+
+                if (Time.time -
+                    pinchStartTime >=
+                    pinchHoldTime)
+                {
+                    pinchStable = true;
+
+                    Debug.Log(
+                        "🤏 Pinch started."
+                    );
+                }
+            }
+        }
+        else
+        {
+            if (pinchStable)
+            {
+                Debug.Log(
+                    "🤏 Pinch released."
+                );
             }
 
-            return;
+            pinchStartTime = 0f;
+            pinchStable = false;
         }
 
-        candidateGesture = newDetectedGesture;
-        candidateStartTime = Time.time;
+        // =====================================================
+        // TWO-HAND PINCH
+        // =====================================================
+
+        if (bothHands &&
+            twoHandPinch)
+        {
+            if (!twoHandPinchStable)
+            {
+                twoHandPinchStable = true;
+
+                Debug.Log(
+                    "🤏🤏 Two-hand scaling started."
+                );
+            }
+        }
+        else
+        {
+            if (twoHandPinchStable)
+            {
+                Debug.Log(
+                    "🤏🤏 Two-hand scaling released."
+                );
+            }
+
+            twoHandPinchStable = false;
+        }
     }
 
+    // =========================================================
+    // PALM CENTER
+    // =========================================================
+
+    Vector2 GetPalmCenter(
+        Mediapipe.Tasks.Components.Containers.NormalizedLandmarks hand)
+    {
+        Vector2 center =
+            Vector2.zero;
+
+        center += new Vector2(
+            hand.landmarks[0].x,
+            hand.landmarks[0].y
+        );
+
+        center += new Vector2(
+            hand.landmarks[5].x,
+            hand.landmarks[5].y
+        );
+
+        center += new Vector2(
+            hand.landmarks[9].x,
+            hand.landmarks[9].y
+        );
+
+        center += new Vector2(
+            hand.landmarks[13].x,
+            hand.landmarks[13].y
+        );
+
+        center += new Vector2(
+            hand.landmarks[17].x,
+            hand.landmarks[17].y
+        );
+
+        return center / 5f;
+    }
 
     // =========================================================
-    // DISTANCE HELPER
+    // DISTANCE
     // =========================================================
 
     float Distance(
         Mediapipe.Tasks.Components.Containers.NormalizedLandmark a,
         Mediapipe.Tasks.Components.Containers.NormalizedLandmark b)
     {
-        float dx = a.x - b.x;
-        float dy = a.y - b.y;
+        float dx =
+            a.x - b.x;
+
+        float dy =
+            a.y - b.y;
 
         return Mathf.Sqrt(
             dx * dx +
@@ -120,119 +503,265 @@ public class GestureManager : MonoBehaviour
         );
     }
 
+    // =========================================================
+    // FINGER EXTENDED
+    // =========================================================
+
+    bool IsFingerClearlyExtended(
+        Mediapipe.Tasks.Components.Containers.NormalizedLandmarks hand,
+        int tipIndex,
+        int pipIndex,
+        int mcpIndex)
+    {
+        var wrist =
+            hand.landmarks[0];
+
+        float tipDistance =
+            Distance(
+                hand.landmarks[tipIndex],
+                wrist
+            );
+
+        float pipDistance =
+            Distance(
+                hand.landmarks[pipIndex],
+                wrist
+            );
+
+        float mcpDistance =
+            Distance(
+                hand.landmarks[mcpIndex],
+                wrist
+            );
+
+        return
+            tipDistance >
+            pipDistance * 1.12f &&
+            tipDistance >
+            mcpDistance * 1.35f;
+    }
 
     // =========================================================
-    // GESTURE DETECTION
+    // FINGER CURLED
+    // =========================================================
+
+    bool IsFingerClearlyCurled(
+        Mediapipe.Tasks.Components.Containers.NormalizedLandmarks hand,
+        int tipIndex,
+        int pipIndex)
+    {
+        var wrist =
+            hand.landmarks[0];
+
+        float tipDistance =
+            Distance(
+                hand.landmarks[tipIndex],
+                wrist
+            );
+
+        float pipDistance =
+            Distance(
+                hand.landmarks[pipIndex],
+                wrist
+            );
+
+        return
+            tipDistance <
+            pipDistance * 1.10f;
+    }
+
+    // =========================================================
+    // CIRCLE
+    // =========================================================
+
+    bool DetectCircle(
+        Mediapipe.Tasks.Components.Containers.NormalizedLandmarks hand)
+    {
+        float thumbIndexDistance =
+            Distance(
+                hand.landmarks[4],
+                hand.landmarks[8]
+            );
+
+        bool thumbIndexTouching =
+            thumbIndexDistance <
+            circleDistanceThreshold;
+
+        bool middleExtended =
+            IsFingerClearlyExtended(
+                hand,
+                12,
+                10,
+                9
+            );
+
+        bool ringExtended =
+            IsFingerClearlyExtended(
+                hand,
+                16,
+                14,
+                13
+            );
+
+        bool pinkyExtended =
+            IsFingerClearlyExtended(
+                hand,
+                20,
+                18,
+                17
+            );
+
+        return
+            thumbIndexTouching &&
+            middleExtended &&
+            ringExtended &&
+            pinkyExtended;
+    }
+
+    // =========================================================
+    // PINCH
+    // =========================================================
+
+    bool DetectPinch(
+        Mediapipe.Tasks.Components.Containers.NormalizedLandmarks hand,
+        out float pinchDistance)
+    {
+        pinchDistance =
+            Distance(
+                hand.landmarks[4],
+                hand.landmarks[8]
+            );
+
+        bool thumbIndexNear =
+            pinchDistance <
+            pinchDistanceThreshold;
+
+        bool middleCurled =
+            IsFingerClearlyCurled(
+                hand,
+                12,
+                10
+            );
+
+        bool ringCurled =
+            IsFingerClearlyCurled(
+                hand,
+                16,
+                14
+            );
+
+        bool pinkyCurled =
+            IsFingerClearlyCurled(
+                hand,
+                20,
+                18
+            );
+
+        return
+            thumbIndexNear &&
+            middleCurled &&
+            ringCurled &&
+            pinkyCurled;
+    }
+
+    // =========================================================
+    // NORMAL GESTURES
     // =========================================================
 
     Gesture DetectGesture(
         Mediapipe.Tasks.Components.Containers.NormalizedLandmarks hand)
     {
-        // -----------------------------------------------------
-        // IMPORTANT LANDMARKS
-        // -----------------------------------------------------
-        //
-        // 0  = Wrist
-        //
-        // Index:
-        // 6  = PIP
-        // 8  = Tip
-        //
-        // Middle:
-        // 10 = PIP
-        // 12 = Tip
-        //
-        // Ring:
-        // 14 = PIP
-        // 16 = Tip
-        //
-        // Pinky:
-        // 18 = PIP
-        // 20 = Tip
-        //
-        // Thumb:
-        // 2 = MCP
-        // 3 = IP
-        // 4 = Tip
-        // -----------------------------------------------------
+        var wrist =
+            hand.landmarks[0];
 
-
-        var wrist = hand.landmarks[0];
-
-
-        // =====================================================
-        // FINGER OPEN/CLOSED
-        // =====================================================
-
-        float openMargin = 0.02f;
+        float openMargin =
+            0.02f;
 
         bool indexOpen =
             hand.landmarks[8].y <
-            hand.landmarks[6].y - openMargin;
+            hand.landmarks[6].y -
+            openMargin;
 
         bool middleOpen =
             hand.landmarks[12].y <
-            hand.landmarks[10].y - openMargin;
+            hand.landmarks[10].y -
+            openMargin;
 
         bool ringOpen =
             hand.landmarks[16].y <
-            hand.landmarks[14].y - openMargin;
+            hand.landmarks[14].y -
+            openMargin;
 
         bool pinkyOpen =
             hand.landmarks[20].y <
-            hand.landmarks[18].y - openMargin;
-
-
-        // =====================================================
-        // CLOSED FINGERS
-        // =====================================================
-        //
-        // Instead of relying only on Y position,
-        // compare fingertip distance to the wrist.
-        // A curled finger brings its tip closer to the palm.
-        // =====================================================
+            hand.landmarks[18].y -
+            openMargin;
 
         bool indexClosed =
-            Distance(hand.landmarks[8], wrist) <
-            Distance(hand.landmarks[6], wrist) * 1.10f;
+            Distance(
+                hand.landmarks[8],
+                wrist
+            ) <
+            Distance(
+                hand.landmarks[6],
+                wrist
+            ) * 1.10f;
 
         bool middleClosed =
-            Distance(hand.landmarks[12], wrist) <
-            Distance(hand.landmarks[10], wrist) * 1.10f;
+            Distance(
+                hand.landmarks[12],
+                wrist
+            ) <
+            Distance(
+                hand.landmarks[10],
+                wrist
+            ) * 1.10f;
 
         bool ringClosed =
-            Distance(hand.landmarks[16], wrist) <
-            Distance(hand.landmarks[14], wrist) * 1.10f;
+            Distance(
+                hand.landmarks[16],
+                wrist
+            ) <
+            Distance(
+                hand.landmarks[14],
+                wrist
+            ) * 1.10f;
 
         bool pinkyClosed =
-            Distance(hand.landmarks[20], wrist) <
-            Distance(hand.landmarks[18], wrist) * 1.10f;
-
+            Distance(
+                hand.landmarks[20],
+                wrist
+            ) <
+            Distance(
+                hand.landmarks[18],
+                wrist
+            ) * 1.10f;
 
         // =====================================================
-        // 👍 THUMB UP
+        // THUMB UP
         // =====================================================
-
-        // Thumb tip must be clearly extended away from
-        // the thumb base.
 
         float thumbTipDistance =
-            Distance(hand.landmarks[4], wrist);
+            Distance(
+                hand.landmarks[4],
+                wrist
+            );
 
         float thumbBaseDistance =
-            Distance(hand.landmarks[2], wrist);
+            Distance(
+                hand.landmarks[2],
+                wrist
+            );
 
         bool thumbExtended =
             thumbTipDistance >
-            thumbBaseDistance * 1.25f;
-
-
-        // Thumb tip should also be clearly above the palm.
+            thumbBaseDistance *
+            1.25f;
 
         bool thumbAbovePalm =
             hand.landmarks[4].y <
-            hand.landmarks[9].y - 0.02f;
-
+            hand.landmarks[9].y -
+            0.02f;
 
         bool thumbUp =
             thumbExtended &&
@@ -242,19 +771,13 @@ public class GestureManager : MonoBehaviour
             ringClosed &&
             pinkyClosed;
 
-
-        // =====================================================
-        // 👍 THUMB UP
-        // =====================================================
-
         if (thumbUp)
         {
             return Gesture.ThumbUp;
         }
 
-
         // =====================================================
-        // ✌️ V SIGN
+        // V SIGN
         // =====================================================
 
         if (indexOpen &&
@@ -265,9 +788,8 @@ public class GestureManager : MonoBehaviour
             return Gesture.VSign;
         }
 
-
         // =====================================================
-        // ✋ OPEN PALM
+        // OPEN PALM
         // =====================================================
 
         if (indexOpen &&
@@ -278,9 +800,8 @@ public class GestureManager : MonoBehaviour
             return Gesture.OpenPalm;
         }
 
-
         // =====================================================
-        // ☝️ INDEX
+        // INDEX
         // =====================================================
 
         if (indexOpen &&
@@ -291,14 +812,8 @@ public class GestureManager : MonoBehaviour
             return Gesture.Index;
         }
 
-
-        // =====================================================
-        // NEUTRAL
-        // =====================================================
-
         return Gesture.Neutral;
     }
-
 
     // =========================================================
     // CLEANUP

@@ -18,6 +18,9 @@ public class ArtworkData
     public int fishSchoolCount;
     public int bubbleBurstCount;
 
+    // Taiwan Theme
+    public int lanternCount;
+
     // -----------------------------------------
     // GESTURES
     // -----------------------------------------
@@ -57,6 +60,9 @@ public class ArtworkData
         coralCount = 0;
         fishSchoolCount = 0;
         bubbleBurstCount = 0;
+
+        // Taiwan Theme
+        lanternCount = 0;
 
         indexGestureCount = 0;
         openPalmGestureCount = 0;

@@ -1,0 +1,676 @@
+fileFormatVersion: 2
+guid: 28908f906523dcc4883e38f3891f177e
+TextureImporter:
+  internalIDToNameTable:
+  - first:
+      213: -3085089746496944249
+    second: Floating Petals_0
+  - first:
+      213: 7337072330725444383
+    second: Floating Petals_1
+  - first:
+      213: 8044076197380675004
+    second: Floating Petals_2
+  - first:
+      213: -8278068095248551174
+    second: Floating Petals_3
+  - first:
+      213: -1048403556195774835
+    second: Floating Petals_4
+  - first:
+      213: -7263259660686513406
+    second: Floating Petals_5
+  - first:
+      213: 480210233500526837
+    second: Floating Petals_6
+  - first:
+      213: -4820458548685270733
+    second: Floating Petals_7
+  - first:
+      213: -4272203527261157699
+    second: Floating Petals_8
+  - first:
+      213: 6526137975285964090
+    second: Floating Petals_9
+  - first:
+      213: 2810718441211104755
+    second: Floating Petals_10
+  - first:
+      213: -7256994451999983963
+    second: Floating Petals_11
+  - first:
+      213: -3251743830872905868
+    second: Floating Petals_12
+  - first:
+      213: 600525704399940615
+    second: Floating Petals_13
+  - first:
+      213: 2827638636418898270
+    second: Floating Petals_14
+  - first:
+      213: 3260905126723062124
+    second: Floating Petals_15
+  - first:
+      213: 3822092211679704882
+    second: Floating Petals_16
+  - first:
+      213: 7116275800251097258
+    second: Floating Petals_17
+  - first:
+      213: -8563176228512263698
+    second: Floating Petals_18
+  - first:
+      213: -3633984978875081839
+    second: Floating Petals_19
+  - first:
+      213: 7503558195760291813
+    second: Floating Petals_20
+  externalObjects: {}
+  serializedVersion: 13
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 1
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 1
+  spriteExtrude: 1
+  spriteMeshType: 0
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 100
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 4
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Android
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: Floating Petals_0
+      rect:
+        serializedVersion: 2
+        x: 592
+        y: 329
+        width: 32
+        height: 46
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 78789d7983f8f25d0800000000000000
+      internalID: -3085089746496944249
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Floating Petals_1
+      rect:
+        serializedVersion: 2
+        x: 520
+        y: 255
+        width: 35
+        height: 59
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: f1bcc3c496482d560800000000000000
+      internalID: 7337072330725444383
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Floating Petals_2
+      rect:
+        serializedVersion: 2
+        x: 572
+        y: 277
+        width: 27
+        height: 36
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: cb5dc03aeac42af60800000000000000
+      internalID: 8044076197380675004
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Floating Petals_3
+      rect:
+        serializedVersion: 2
+        x: 244
+        y: 220
+        width: 38
+        height: 23
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: af2373c2de46e1d80800000000000000
+      internalID: -8278068095248551174
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Floating Petals_4
+      rect:
+        serializedVersion: 2
+        x: 459
+        y: 242
+        width: 38
+        height: 32
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: d8ec1b335825371f0800000000000000
+      internalID: -1048403556195774835
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Floating Petals_5
+      rect:
+        serializedVersion: 2
+        x: 532
+        y: 199
+        width: 37
+        height: 46
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 20b2b5d22d7b33b90800000000000000
+      internalID: -7263259660686513406
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Floating Petals_6
+      rect:
+        serializedVersion: 2
+        x: 356
+        y: 207
+        width: 61
+        height: 32
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 5f86e41c9ac0aa600800000000000000
+      internalID: 480210233500526837
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Floating Petals_7
+      rect:
+        serializedVersion: 2
+        x: 172
+        y: 162
+        width: 37
+        height: 21
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 3319e176d7a4a1db0800000000000000
+      internalID: -4820458548685270733
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Floating Petals_8
+      rect:
+        serializedVersion: 2
+        x: 255
+        y: 126
+        width: 35
+        height: 52
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: db68d6de68516b4c0800000000000000
+      internalID: -4272203527261157699
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Floating Petals_9
+      rect:
+        serializedVersion: 2
+        x: 324
+        y: 105
+        width: 48
+        height: 71
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: a3d5b1c59ef719a50800000000000000
+      internalID: 6526137975285964090
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Floating Petals_10
+      rect:
+        serializedVersion: 2
+        x: 435
+        y: 145
+        width: 32
+        height: 32
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 3fd070cc78da10720800000000000000
+      internalID: 2810718441211104755
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Floating Petals_11
+      rect:
+        serializedVersion: 2
+        x: 495
+        y: 135
+        width: 23
+        height: 57
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 5a67f8fbef9f94b90800000000000000
+      internalID: -7256994451999983963
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Floating Petals_12
+      rect:
+        serializedVersion: 2
+        x: 66
+        y: 82
+        width: 35
+        height: 47
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 477a04cd63c7fd2d0800000000000000
+      internalID: -3251743830872905868
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Floating Petals_13
+      rect:
+        serializedVersion: 2
+        x: 124
+        y: 111
+        width: 28
+        height: 39
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 70cef3942fe755800800000000000000
+      internalID: 600525704399940615
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Floating Petals_14
+      rect:
+        serializedVersion: 2
+        x: 169
+        y: 74
+        width: 61
+        height: 34
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: e591becbb5acd3720800000000000000
+      internalID: 2827638636418898270
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Floating Petals_15
+      rect:
+        serializedVersion: 2
+        x: 392
+        y: 71
+        width: 57
+        height: 38
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: c69049c8fef014d20800000000000000
+      internalID: 3260905126723062124
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Floating Petals_16
+      rect:
+        serializedVersion: 2
+        x: 86
+        y: 15
+        width: 57
+        height: 33
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 237b4ffbd9cca0530800000000000000
+      internalID: 3822092211679704882
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Floating Petals_17
+      rect:
+        serializedVersion: 2
+        x: 241
+        y: 41
+        width: 62
+        height: 29
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: aa0ecadf22712c260800000000000000
+      internalID: 7116275800251097258
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Floating Petals_18
+      rect:
+        serializedVersion: 2
+        x: 353
+        y: 34
+        width: 22
+        height: 33
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: ee1157ef69c792980800000000000000
+      internalID: -8563176228512263698
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Floating Petals_19
+      rect:
+        serializedVersion: 2
+        x: 3
+        y: 3
+        width: 42
+        height: 33
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 19b9b075aed719dc0800000000000000
+      internalID: -3633984978875081839
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Floating Petals_20
+      rect:
+        serializedVersion: 2
+        x: 173
+        y: 0
+        width: 34
+        height: 28
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 5ef53c96c6ef12860800000000000000
+      internalID: 7503558195760291813
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    customData: 
+    physicsShape: []
+    bones: []
+    spriteID: 5e97eb03825dee720800000000000000
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    spriteCustomMetadata:
+      entries: []
+    nameFileIdTable:
+      Floating Petals_0: -3085089746496944249
+      Floating Petals_1: 7337072330725444383
+      Floating Petals_10: 2810718441211104755
+      Floating Petals_11: -7256994451999983963
+      Floating Petals_12: -3251743830872905868
+      Floating Petals_13: 600525704399940615
+      Floating Petals_14: 2827638636418898270
+      Floating Petals_15: 3260905126723062124
+      Floating Petals_16: 3822092211679704882
+      Floating Petals_17: 7116275800251097258
+      Floating Petals_18: -8563176228512263698
+      Floating Petals_19: -3633984978875081839
+      Floating Petals_2: 8044076197380675004
+      Floating Petals_20: 7503558195760291813
+      Floating Petals_3: -8278068095248551174
+      Floating Petals_4: -1048403556195774835
+      Floating Petals_5: -7263259660686513406
+      Floating Petals_6: 480210233500526837
+      Floating Petals_7: -4820458548685270733
+      Floating Petals_8: -4272203527261157699
+      Floating Petals_9: 6526137975285964090
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

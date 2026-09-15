@@ -5,17 +5,30 @@ public class OpenPalmGesture : MonoBehaviour
     [Header("Gesture Manager")]
     public GestureManager gestureManager;
 
-    [Header("Coral")]
+    [Header("Coral - Underwater")]
     public GameObject elementPrefab;
 
-    private bool hasSpawnedForCurrentPalm = false;
+    [Header("Lantern - Taiwan")]
+    public GameObject lanternPrefab;
+
+    private bool hasSpawnedForCurrentPalm =
+        false;
 
     void Start()
     {
         if (gestureManager == null)
         {
             Debug.LogError(
-                "OpenPalmGesture: GestureManager is not assigned!"
+                "OpenPalmGesture: " +
+                "GestureManager is not assigned!"
+            );
+        }
+
+        if (ThemeManager.Instance == null)
+        {
+            Debug.LogError(
+                "OpenPalmGesture: " +
+                "ThemeManager is not present in the scene!"
             );
         }
     }
@@ -29,23 +42,43 @@ public class OpenPalmGesture : MonoBehaviour
             gestureManager.CurrentGesture ==
             GestureManager.Gesture.OpenPalm;
 
-        // Open palm detected
         if (isOpenPalm)
         {
-            // Already spawned for this gesture
             if (hasSpawnedForCurrentPalm)
                 return;
 
-            SpawnCoral();
+            SpawnThemeElement();
 
-            hasSpawnedForCurrentPalm = true;
+            hasSpawnedForCurrentPalm =
+                true;
 
             return;
         }
 
-        // Hand changed to Neutral/another gesture.
-        // Allow the next Open Palm to trigger.
-        hasSpawnedForCurrentPalm = false;
+        hasSpawnedForCurrentPalm =
+            false;
+    }
+
+    void SpawnThemeElement()
+    {
+        if (ThemeManager.Instance == null)
+        {
+            Debug.LogError(
+                "OpenPalmGesture: " +
+                "ThemeManager is missing."
+            );
+
+            return;
+        }
+
+        if (ThemeManager.Instance.IsTaiwan())
+        {
+            SpawnLantern();
+        }
+        else
+        {
+            SpawnCoral();
+        }
     }
 
     void SpawnCoral()
@@ -53,31 +86,106 @@ public class OpenPalmGesture : MonoBehaviour
         if (elementPrefab == null)
         {
             Debug.LogError(
-                "OpenPalmGesture: Coral prefab is not assigned!"
+                "OpenPalmGesture: " +
+                "Coral prefab is not assigned!"
             );
 
             return;
         }
 
         HandTrackingBrush brush =
-            FindFirstObjectByType<HandTrackingBrush>();
+            FindFirstObjectByType<
+                HandTrackingBrush>();
 
-        if (brush == null || brush.brush == null)
+        if (brush == null ||
+            brush.brush == null)
+        {
             return;
+        }
 
         Vector3 spawnPosition =
             brush.brush.position;
 
         spawnPosition.z = 0f;
 
-        Instantiate(
-            elementPrefab,
-            spawnPosition,
-            Quaternion.identity
-        );
+        GameObject coral =
+            Instantiate(
+                elementPrefab,
+                spawnPosition,
+                Quaternion.identity
+            );
+
+        coral.tag =
+            "ArtworkElement";
+
         if (ArtworkStatistics.Instance != null)
         {
-            ArtworkStatistics.Instance.data.coralCount++;
+            ArtworkStatistics.Instance
+                .data.coralCount++;
         }
+
+        if (ArtworkActionHistory.Instance != null)
+        {
+            ArtworkActionHistory.Instance
+                .RegisterAction(coral);
+        }
+
+        Debug.Log(
+            "🪸 Coral created."
+        );
+    }
+
+    void SpawnLantern()
+    {
+        if (lanternPrefab == null)
+        {
+            Debug.LogError(
+                "OpenPalmGesture: " +
+                "Lantern prefab is not assigned!"
+            );
+
+            return;
+        }
+
+        HandTrackingBrush brush =
+            FindFirstObjectByType<
+                HandTrackingBrush>();
+
+        if (brush == null ||
+            brush.brush == null)
+        {
+            return;
+        }
+
+        Vector3 spawnPosition =
+            brush.brush.position;
+
+        spawnPosition.z = 0f;
+
+        GameObject lantern =
+            Instantiate(
+                lanternPrefab,
+                spawnPosition,
+                Quaternion.identity
+            );
+
+        lantern.tag =
+            "ArtworkElement";
+
+        if (ArtworkStatistics.Instance != null)
+        {
+            ArtworkStatistics.Instance
+                .data.lanternCount++;
+        }
+
+        if (ArtworkActionHistory.Instance != null)
+        {
+            ArtworkActionHistory.Instance
+                .RegisterAction(lantern);
+        }
+
+        Debug.Log(
+            "🏮 Lantern created."
+        );
     }
 }

@@ -10,7 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 165815324145522764}
   - component: {fileID: 931697853190422206}
-  - component: {fileID: -6891727755017832700}
+  - component: {fileID: 4774030186867274703}
   m_Layer: 0
   m_Name: Fish
   m_TagString: Untagged
@@ -92,7 +92,7 @@ SpriteRenderer:
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
---- !u!114 &-6891727755017832700
+--- !u!114 &4774030186867274703
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -104,7 +104,3 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 91496bf90fc1ac34592cbba808a35484, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FishMovement
-  speed: 0.5
-  wobbleAmount: 0.08
-  wobbleSpeed: 2
-  lifetime: 12
