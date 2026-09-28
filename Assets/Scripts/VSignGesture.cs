@@ -284,6 +284,16 @@ public class VSignGesture : MonoBehaviour
                 );
         }
 
+        // =====================================================
+        // AI FEEDBACK (Phase 1 Trigger)
+        // =====================================================
+
+        if (AIFeedbackClient.Instance != null)
+        {
+            AIFeedbackClient.Instance
+                .RequestFeedback("object_added");
+        }
+
         if (ArtworkStatistics.Instance != null)
         {
             ArtworkStatistics.Instance

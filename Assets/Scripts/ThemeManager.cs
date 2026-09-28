@@ -16,7 +16,7 @@ public class ThemeManager : MonoBehaviour
 
     public Theme CurrentTheme => currentTheme;
 
-    void Awake()
+    private void Awake()
     {
         if (Instance != null && Instance != this)
         {
@@ -26,6 +26,23 @@ public class ThemeManager : MonoBehaviour
 
         Instance = this;
 
+        // Read the theme selected from the Main Menu.
+        string savedTheme = PlayerPrefs.GetString(
+            "SelectedTheme",
+            "Underwater"
+        );
+
+        if (savedTheme == "Taiwan")
+        {
+            currentTheme = Theme.Taiwan;
+        }
+        else
+        {
+            currentTheme = Theme.Underwater;
+        }
+
+        Debug.Log("THEME LOADED → " + currentTheme);
+
         DontDestroyOnLoad(gameObject);
     }
 
@@ -33,10 +50,14 @@ public class ThemeManager : MonoBehaviour
     {
         currentTheme = newTheme;
 
-        Debug.Log(
-            "THEME CHANGED → " +
-            currentTheme
+        PlayerPrefs.SetString(
+            "SelectedTheme",
+            currentTheme.ToString()
         );
+
+        PlayerPrefs.Save();
+
+        Debug.Log("THEME CHANGED → " + currentTheme);
     }
 
     public bool IsUnderwater()

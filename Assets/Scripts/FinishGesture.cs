@@ -2,6 +2,7 @@ using System.Collections;
 using Mediapipe.Tasks.Vision.HandLandmarker;
 using Mediapipe.Unity.Sample.HandLandmarkDetection;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class FinishGesture : MonoBehaviour
 {
@@ -15,12 +16,14 @@ public class FinishGesture : MonoBehaviour
     [Header("Save Settings")]
     public string fileNamePrefix = "BodyAsBrush_Artwork_";
 
-    // Data received from MediaPipe callback
+    [Header("Result Scene")]
+    public string resultSceneName = "ArtworkResultScene";
+
     private bool detectedBothHands = false;
     private bool detectedHandsTogether = false;
 
-    // Main-thread state
     private float holdTimer = 0f;
+
     private bool alreadyFinished = false;
 
     private readonly object finishLock = new object();
@@ -39,8 +42,6 @@ public class FinishGesture : MonoBehaviour
         }
     }
 
-    // IMPORTANT:
-    // Do not use Unity API or Time.time here.
     void OnHandResult(HandLandmarkerResult result)
     {
         bool newBothHandsDetected = false;
@@ -60,10 +61,13 @@ public class FinishGesture : MonoBehaviour
                 Vector2 palm1 = GetPalmCenter(hand1);
                 Vector2 palm2 = GetPalmCenter(hand2);
 
-                float distance =
-                    Vector2.Distance(palm1, palm2);
+                float distance = Vector2.Distance(
+                    palm1,
+                    palm2
+                );
 
                 newBothHandsDetected = true;
+
                 newHandsTogether =
                     distance < handsTogetherDistance;
             }
@@ -120,22 +124,25 @@ public class FinishGesture : MonoBehaviour
             handsTogether = detectedHandsTogether;
         }
 
-        // Hands separated or one hand disappeared.
-        // Reset the timer and ARM the next artwork.
+        // Reset timer if the finish gesture is broken
         if (!bothHands || !handsTogether)
         {
             holdTimer = 0f;
 
+            // Re-arm after the user separates their hands
             if (alreadyFinished)
             {
                 alreadyFinished = false;
-                Debug.Log("Finish gesture re-armed.");
+
+                Debug.Log(
+                    "Finish gesture re-armed."
+                );
             }
 
             return;
         }
 
-        // Already finished this hands-together event.
+        // Prevent repeated finishing while hands remain together
         if (alreadyFinished)
             return;
 
@@ -156,27 +163,52 @@ public class FinishGesture : MonoBehaviour
         }
     }
 
-   void FinishArtwork()
-    {
-        Debug.Log("ARTWORK FINISHED!");
+    // =========================================================
+    // FINISH ARTWORK
+    // =========================================================
 
+    void FinishArtwork()
+    {
+        Debug.Log("================================");
+        Debug.Log("ARTWORK FINISHED!");
+        Debug.Log("================================");
+
+        // Finalize statistics first
         if (ArtworkStatistics.Instance != null)
         {
             ArtworkStatistics.Instance.FinalizeStatistics();
         }
+        else
+        {
+            Debug.LogError(
+                "FinishGesture: ArtworkStatistics.Instance is missing!"
+            );
 
+            return;
+        }
+
+        // Capture artwork
         StartCoroutine(SaveArtwork());
     }
 
+    // =========================================================
+    // SAVE ARTWORK
+    // =========================================================
+
     IEnumerator SaveArtwork()
     {
+        // Wait until the frame is completely rendered
         yield return new WaitForEndOfFrame();
 
         string timestamp =
-            System.DateTime.Now.ToString("yyyyMMdd_HHmmss");
+            System.DateTime.Now.ToString(
+                "yyyyMMdd_HHmmss"
+            );
 
         string fileName =
-            fileNamePrefix + timestamp + ".png";
+            fileNamePrefix +
+            timestamp +
+            ".png";
 
         string path =
             System.IO.Path.Combine(
@@ -184,12 +216,95 @@ public class FinishGesture : MonoBehaviour
                 fileName
             );
 
+        // Capture the current screen
         ScreenCapture.CaptureScreenshot(path);
 
         Debug.Log(
-            "Artwork saved to:\n" + path
+            "Artwork saved to:"
+        );
+
+        Debug.Log(path);
+
+        // Wait one frame so the screenshot operation
+        // has time to begin before moving on.
+        yield return null;
+
+        // =====================================================
+        // GET ARTWORK DATA
+        // =====================================================
+
+        ArtworkData artworkData = null;
+
+        if (ArtworkStatistics.Instance != null)
+        {
+            artworkData =
+                ArtworkStatistics.Instance.data;
+        }
+
+        if (artworkData == null)
+        {
+            Debug.LogError(
+                "FinishGesture: ArtworkData is missing!"
+            );
+
+            yield break;
+        }
+
+        // =====================================================
+        // GET SELECTED THEME
+        // =====================================================
+
+        string theme =
+            PlayerPrefs.GetString(
+                "SelectedTheme",
+                "Unknown"
+            );
+
+        Debug.Log(
+            "Selected Theme: " + theme
+        );
+
+        // =====================================================
+        // STORE RESULT DATA
+        // =====================================================
+
+        if (ArtworkResultManager.Instance == null)
+        {
+            Debug.LogError(
+                "FinishGesture: " +
+                "ArtworkResultManager.Instance was not found!"
+            );
+
+            yield break;
+        }
+
+        ArtworkResultManager.Instance.SetResult(
+            artworkData,
+            path,
+            theme
+        );
+
+        Debug.Log(
+            "Artwork result data stored successfully."
+        );
+
+        // =====================================================
+        // LOAD RESULT SCENE
+        // =====================================================
+
+        Debug.Log(
+            "Loading Result Scene: " +
+            resultSceneName
+        );
+
+        SceneManager.LoadScene(
+            resultSceneName
         );
     }
+
+    // =========================================================
+    // CLEANUP
+    // =========================================================
 
     void OnDestroy()
     {

@@ -6,16 +6,23 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/Scenes/IntroScene.unity
-    guid: e5f67890123456789abcdef123450000
+    path: Assets/Scenes/MainMenu.unity
+    guid: a6ce088545cc1f84ea32c473d0dab0c5
+  - enabled: 1
+    path: Assets/Scenes/DrawingScene.unity
+    guid: d6aeafad79a3b1e4e8d7f5e3f9d20a19
   - enabled: 1
     path: Assets/Scenes/StoryScene.unity
     guid: f67890123456789abcdef12345600000
   - enabled: 1
-    path: Assets/Scenes/SampleScene.unity
-    guid: 8c9cfa26abfee488c85f1582747f6a02
-  - enabled: 1
-    path: Assets/Samples/MediaPipe Unity Plugin/0.16.3/Official Solutions/Scenes/Hand Landmark Detection/Hand Landmark Detection.unity
+    path: Assets/Samples/MediaPipe Unity Plugin/0.16.3/Official Solutions/Scenes/Hand
+      Landmark Detection/Hand Landmark Detection.unity
     guid: 98d49dcfe667ea822a91d6b74f7cb2e9
+  - enabled: 1
+    path: Assets/Scenes/ArtworkResultScene.unity
+    guid: e2198c3b0e4a3b44c9a804370cfa5a8c
+  - enabled: 1
+    path: Assets/Scenes/Scene2.unity
+    guid: b8af4cb68f95e314397e9a79229fe56b
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 2bcd2660ca9b64942af0de543d8d7100, type: 3}
