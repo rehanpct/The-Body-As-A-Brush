@@ -23,6 +23,7 @@ public class Scene2Manager : MonoBehaviour
 
     [Header("Scene Settings")]
     public string mainMenuSceneName = "MainMenu";
+    public string scene3Name = "scene3";
 
     [Header("Dialogue Settings")]
     [TextArea(3, 6)]
@@ -63,45 +64,29 @@ public class Scene2Manager : MonoBehaviour
 
         if (backButton != null)
         {
-            backButton.onClick.AddListener(BackToMainMenu);
-        }
-        else
-        {
-            Debug.LogWarning(
-                "Scene2Manager: Back Button is not assigned."
+            backButton.onClick.AddListener(
+                BackToMainMenu
             );
         }
 
         if (skipButton != null)
         {
-            skipButton.onClick.AddListener(SkipDialogue);
-        }
-        else
-        {
-            Debug.LogWarning(
-                "Scene2Manager: Skip Button is not assigned."
+            skipButton.onClick.AddListener(
+                SkipDialogue
             );
         }
 
         if (noButton != null)
         {
-            noButton.onClick.AddListener(NoThanks);
-        }
-        else
-        {
-            Debug.LogWarning(
-                "Scene2Manager: No Button is not assigned."
+            noButton.onClick.AddListener(
+                NoThanks
             );
         }
 
         if (yesButton != null)
         {
-            yesButton.onClick.AddListener(YesLetsGo);
-        }
-        else
-        {
-            Debug.LogWarning(
-                "Scene2Manager: Yes Button is not assigned."
+            yesButton.onClick.AddListener(
+                YesLetsGo
             );
         }
 
@@ -111,9 +96,17 @@ public class Scene2Manager : MonoBehaviour
 
         ShowTalkingCharacter();
 
-        Debug.Log("================================");
-        Debug.Log("SCENE 2 INITIALIZED");
-        Debug.Log("================================");
+        Debug.Log(
+            "================================"
+        );
+
+        Debug.Log(
+            "SCENE 2 INITIALIZED"
+        );
+
+        Debug.Log(
+            "================================"
+        );
     }
 
     // =========================================================
@@ -122,11 +115,15 @@ public class Scene2Manager : MonoBehaviour
 
     public void BackToMainMenu()
     {
-        Debug.Log("Scene 2: BACK pressed.");
+        Debug.Log(
+            "Scene 2: BACK pressed."
+        );
 
         CancelInvoke();
 
-        SceneManager.LoadScene(mainMenuSceneName);
+        SceneManager.LoadScene(
+            mainMenuSceneName
+        );
     }
 
     // =========================================================
@@ -135,11 +132,13 @@ public class Scene2Manager : MonoBehaviour
 
     public void SkipDialogue()
     {
-        Debug.Log("Scene 2: SKIP pressed.");
+        Debug.Log(
+            "Scene 2: SKIP pressed."
+        );
 
         CancelInvoke();
 
-        GoToThemeSelection();
+        GoToScene3();
     }
 
     // =========================================================
@@ -148,20 +147,20 @@ public class Scene2Manager : MonoBehaviour
 
     public void NoThanks()
     {
-        Debug.Log("Scene 2: NO pressed.");
+        Debug.Log(
+            "Scene 2: NO pressed."
+        );
 
         CancelInvoke();
 
-        // Change dialogue
         if (dialogueText != null)
         {
-            dialogueText.text = noResponse;
+            dialogueText.text =
+                noResponse;
         }
 
-        // Change Nizki expression
         ShowThinkingCharacter();
 
-        // Hide both choices
         if (noButton != null)
         {
             noButton.gameObject.SetActive(false);
@@ -183,20 +182,20 @@ public class Scene2Manager : MonoBehaviour
 
     public void YesLetsGo()
     {
-        Debug.Log("Scene 2: YES pressed.");
+        Debug.Log(
+            "Scene 2: YES pressed."
+        );
 
         CancelInvoke();
 
-        // Change dialogue
         if (dialogueText != null)
         {
-            dialogueText.text = yesResponse;
+            dialogueText.text =
+                yesResponse;
         }
 
-        // Change Nizki expression
         ShowExcitedCharacter();
 
-        // Hide both choices
         if (noButton != null)
         {
             noButton.gameObject.SetActive(false);
@@ -211,32 +210,26 @@ public class Scene2Manager : MonoBehaviour
             "Scene 2: Nizki switched to Excited."
         );
 
-        // Give player time to see the response
         Invoke(
-            nameof(GoToThemeSelection),
+            nameof(GoToScene3),
             yesResponseDelay
         );
     }
 
     // =========================================================
-    // THEME SELECTION
+    // GO TO SCENE 3
     // =========================================================
 
-    public void GoToThemeSelection()
+    public void GoToScene3()
     {
         Debug.Log(
-            "Scene 2: Returning to Main Menu and opening Theme Selection."
+            "Scene 2: Loading Scene 3 destination map."
         );
 
-        PlayerPrefs.SetInt(
-            "OpenThemeSelection",
-            1
-        );
-
-        PlayerPrefs.Save();
+        CancelInvoke();
 
         SceneManager.LoadScene(
-            mainMenuSceneName
+            scene3Name
         );
     }
 
@@ -283,10 +276,6 @@ public class Scene2Manager : MonoBehaviour
         GameObject activeCharacter
     )
     {
-        // -----------------------------------------------------
-        // Disable every character state
-        // -----------------------------------------------------
-
         if (idleCharacter != null)
         {
             idleCharacter.SetActive(false);
@@ -312,19 +301,9 @@ public class Scene2Manager : MonoBehaviour
             excitedCharacter.SetActive(false);
         }
 
-        // -----------------------------------------------------
-        // Enable selected state
-        // -----------------------------------------------------
-
         if (activeCharacter != null)
         {
             activeCharacter.SetActive(true);
-        }
-        else
-        {
-            Debug.LogWarning(
-                "Scene2Manager: Selected character state is not assigned."
-            );
         }
     }
 
