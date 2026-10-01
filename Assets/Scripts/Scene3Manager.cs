@@ -5,27 +5,23 @@ using UnityEngine.UI;
 public class Scene3Manager : MonoBehaviour
 {
     [Header("Visit Buttons")]
-    public Button nightMarketVisitButton;
-    public Button oceanVisitButton;
+    [SerializeField] private Button nightMarketVisitButton;
+    [SerializeField] private Button oceanVisitButton;
 
-    [Header("Navigation")]
-    public Button backButton;
+    [Header("Navigation Buttons")]
+    [SerializeField] private Button backButton;
+    [SerializeField] private Button homeButton;
 
     [Header("Scene Names")]
-    public string previousSceneName = "Scene2";
-    public string drawingSceneName = "DrawingScene";
+    [SerializeField] private string previousSceneName = "Scene2";
+    [SerializeField] private string mainMenuSceneName = "MainMenu";
+    [SerializeField] private string gestureSceneName = "Scene4";
 
     private void Start()
     {
-        // =====================================================
-        // NIGHT MARKET BUTTON
-        // =====================================================
-
         if (nightMarketVisitButton != null)
         {
-            nightMarketVisitButton.onClick.AddListener(
-                SelectTaiwan
-            );
+            nightMarketVisitButton.onClick.AddListener(SelectTaiwan);
         }
         else
         {
@@ -34,15 +30,9 @@ public class Scene3Manager : MonoBehaviour
             );
         }
 
-        // =====================================================
-        // OCEAN BUTTON
-        // =====================================================
-
         if (oceanVisitButton != null)
         {
-            oceanVisitButton.onClick.AddListener(
-                SelectUnderwater
-            );
+            oceanVisitButton.onClick.AddListener(SelectUnderwater);
         }
         else
         {
@@ -51,34 +41,19 @@ public class Scene3Manager : MonoBehaviour
             );
         }
 
-        // =====================================================
-        // BACK BUTTON
-        // =====================================================
-
         if (backButton != null)
         {
-            backButton.onClick.AddListener(
-                BackToScene2
-            );
+            backButton.onClick.AddListener(BackToScene2);
         }
-        else
+
+        if (homeButton != null)
         {
-            Debug.LogWarning(
-                "Scene3Manager: Back Button is not assigned."
-            );
+            homeButton.onClick.AddListener(BackToMainMenu);
         }
 
-        Debug.Log(
-            "================================"
-        );
-
-        Debug.Log(
-            "SCENE 3 INITIALIZED"
-        );
-
-        Debug.Log(
-            "================================"
-        );
+        Debug.Log("================================");
+        Debug.Log("SCENE 3 INITIALIZED");
+        Debug.Log("================================");
     }
 
     // =========================================================
@@ -87,22 +62,11 @@ public class Scene3Manager : MonoBehaviour
 
     public void SelectTaiwan()
     {
-        Debug.Log(
-            "Scene 3: Taiwan Night Market selected."
-        );
+        Debug.Log("Scene 3: Taiwan Night Market selected.");
 
-        PlayerPrefs.SetString(
-            "SelectedTheme",
-            "Taiwan"
-        );
+        SetSelectedTheme("Taiwan");
 
-        PlayerPrefs.Save();
-
-        Debug.Log(
-            "SelectedTheme = Taiwan"
-        );
-
-        LoadDrawingScene();
+        LoadGestureScene();
     }
 
     // =========================================================
@@ -111,26 +75,70 @@ public class Scene3Manager : MonoBehaviour
 
     public void SelectUnderwater()
     {
-        Debug.Log(
-            "Scene 3: Ocean Exploration selected."
-        );
+        Debug.Log("Scene 3: Ocean Exploration selected.");
 
-        PlayerPrefs.SetString(
-            "SelectedTheme",
-            "Underwater"
-        );
+        SetSelectedTheme("Underwater");
 
-        PlayerPrefs.Save();
-
-        Debug.Log(
-            "SelectedTheme = Underwater"
-        );
-
-        LoadDrawingScene();
+        LoadGestureScene();
     }
 
     // =========================================================
-    // BACK TO SCENE 2
+    // SET THEME
+    // =========================================================
+
+    private void SetSelectedTheme(string theme)
+    {
+        // Save for scenes that load later.
+        PlayerPrefs.SetString("SelectedTheme", theme);
+        PlayerPrefs.Save();
+
+        Debug.Log("SelectedTheme PlayerPrefs = " + theme);
+
+        // IMPORTANT:
+        // If ThemeManager already exists from a previous session,
+        // update the live singleton immediately.
+        if (ThemeManager.Instance != null)
+        {
+            if (theme == "Taiwan")
+            {
+                ThemeManager.Instance.SetTheme(
+                    ThemeManager.Theme.Taiwan
+                );
+            }
+            else
+            {
+                ThemeManager.Instance.SetTheme(
+                    ThemeManager.Theme.Underwater
+                );
+            }
+
+            Debug.Log(
+                "Live ThemeManager updated = " +
+                ThemeManager.Instance.CurrentTheme
+            );
+        }
+        else
+        {
+            Debug.Log(
+                "ThemeManager instance not currently loaded. " +
+                "DrawingScene will load the saved theme."
+            );
+        }
+    }
+
+    // =========================================================
+    // LOAD SCENE 4
+    // =========================================================
+
+    private void LoadGestureScene()
+    {
+        Debug.Log("Scene 3: Loading Scene 4 - Gesture Guide.");
+
+        SceneManager.LoadScene(gestureSceneName);
+    }
+
+    // =========================================================
+    // BACK
     // =========================================================
 
     public void BackToScene2()
@@ -139,24 +147,20 @@ public class Scene3Manager : MonoBehaviour
             "Scene 3: BACK pressed - returning to Scene 2."
         );
 
-        SceneManager.LoadScene(
-            previousSceneName
-        );
+        SceneManager.LoadScene(previousSceneName);
     }
 
     // =========================================================
-    // LOAD DRAWING SCENE
+    // HOME
     // =========================================================
 
-    private void LoadDrawingScene()
+    public void BackToMainMenu()
     {
         Debug.Log(
-            "Scene 3: Loading DrawingScene."
+            "Scene 3: HOME pressed - returning to Main Menu."
         );
 
-        SceneManager.LoadScene(
-            drawingSceneName
-        );
+        SceneManager.LoadScene(mainMenuSceneName);
     }
 
     // =========================================================
@@ -183,6 +187,13 @@ public class Scene3Manager : MonoBehaviour
         {
             backButton.onClick.RemoveListener(
                 BackToScene2
+            );
+        }
+
+        if (homeButton != null)
+        {
+            homeButton.onClick.RemoveListener(
+                BackToMainMenu
             );
         }
     }
