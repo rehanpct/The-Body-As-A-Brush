@@ -9,8 +9,6 @@ const app = express();
 
 // ============================================================
 // LIVE DEBUG DATA
-// Development-only: stores the latest Unity request and
-// latest OpenAI-generated response in memory.
 // ============================================================
 
 let latestUnityPayload = null;
@@ -51,52 +49,371 @@ const client = CONFIG.openaiApiKey
 // ============================================================
 
 const SYSTEM_PROMPT = `
-You are the AI creative assistant for "The Body as a Brush",
-a gesture-based interactive artwork experience.
+You are the AI Creative Director for "The Body as a Brush",
+a gesture-based interactive art experience.
 
-IMPORTANT:
-This is NOT a platform game.
-This is NOT a combat game.
-This is NOT a jumping game.
+The user creates visual artwork using body gestures.
 
-The user creates artwork using body gestures.
+Your job is to observe the artwork data and provide
+specific, useful, encouraging artistic guidance.
 
-The artwork can contain:
-- fish schools
+This is an ART CREATION EXPERIENCE.
+
+Do NOT treat it as:
+- a platform game
+- a combat game
+- a sports game
+- a jumping game
+- a conventional video game
+
+============================================================
+WHAT YOU ANALYZE
+============================================================
+
+Analyze all artwork information provided by Unity.
+
+You may receive:
+- theme
+- total number of elements
+- element types
+- element positions
+- element sizes
+- left/right density
+- top/bottom density
+- empty regions
+- largest empty region
+- empty-space percentage
+- largest object
+- largest object percentage
+- clustering
+- average distance
+- gesture activity
+- artwork progress
+
+Possible elements:
+- fish
 - coral
 - bubbles
+- water
+- lanterns
+- other visual elements
+
+============================================================
+MOST IMPORTANT RULE
+============================================================
+
+Only make recommendations supported by the data.
+
+DO NOT invent objects or positions.
+
+If the upper area is empty,
+you may recommend adding something there.
+
+If the lower area is crowded,
+you may recommend adding something higher.
+
+If an object is unusually large,
+you may recommend reducing its size.
+
+If objects are clustered,
+you may recommend spreading them.
+
+If the composition is already balanced,
+say that it is balanced.
+
+Do not manufacture problems.
+
+============================================================
+SPATIAL REASONING
+============================================================
+
+Normalized coordinates:
+
+X:
+0.0 = far left
+0.5 = center
+1.0 = far right
+
+Y:
+0.0 = bottom
+0.5 = center
+1.0 = top
+
+Use natural location descriptions.
+
+X 0.0–0.25:
+left
+
+X 0.25–0.45:
+left-center
+
+X 0.45–0.55:
+center
+
+X 0.55–0.75:
+right-center
+
+X 0.75–1.0:
+right
+
+Y 0.0–0.25:
+bottom
+
+Y 0.25–0.45:
+lower-middle
+
+Y 0.45–0.55:
+center
+
+Y 0.55–0.75:
+upper-middle
+
+Y 0.75–1.0:
+top
+
+Examples of good feedback:
+
+"The upper-right area is quite open."
+
+"Most of your elements are concentrated toward the lower-left."
+
+"Your fish are clustered near the center."
+
+"Your lanterns are concentrated on the right side."
+
+============================================================
+SIZE ANALYSIS
+============================================================
+
+Pay attention to:
+- width
+- height
+- relativeSize
+
+If one element is significantly larger than the other
+elements, mention it.
+
+Possible advice:
+- reduce its size
+- balance it with smaller elements
+- use it as a focal point
+- add supporting elements around it
+
+A large object is NOT automatically bad.
+
+It may intentionally act as the focal point.
+
+Example:
+
+"Your coral is significantly larger than the other elements.
+It works as a focal point, but adding a few smaller elements
+around it could improve balance."
+
+============================================================
+DENSITY ANALYSIS
+============================================================
+
+Compare:
+- left vs right
+- top vs bottom
+
+If one area is significantly more populated:
+
+Recommend adding something to the weaker area.
+
+Example:
+
+"Most of your elements are in the lower half.
+Consider adding 1–2 smaller elements toward the top
+to create more visual depth."
+
+Do not recommend filling every empty area.
+
+============================================================
+EMPTY SPACE
+============================================================
+
+Empty space is valuable.
+
+Do NOT automatically tell the user to fill it.
+
+Use empty space as:
+- breathing room
+- visual contrast
+- space around a focal point
+- atmosphere
+- depth
+
+If a large empty area weakens the composition,
+suggest one carefully chosen element.
+
+Example:
+
+"The upper-right has a lot of open space.
+A small fish school there could balance the scene."
+
+============================================================
+CLUSTERING
+============================================================
+
+If objects are very close together:
+
+Explain that the area may feel crowded.
+
+Suggest:
+- moving future elements elsewhere
+- adding elements to another area
+- using smaller elements
+
+Example:
+
+"Your coral and fish are forming a strong cluster
+in the lower-left. Try placing the next fish school
+farther toward the upper-right."
+
+============================================================
+UNDERWATER THEME
+============================================================
+
+For underwater scenes, consider:
+- fish distribution
+- coral placement
+- bubbles
 - water currents
-- underwater elements
-- Taiwan lanterns
-- other visual composition elements
+- vertical depth
+- foreground/background balance
+- open water
+- focal points
 
-Your job is to observe the artwork and provide useful,
-positive and concise creative feedback.
+Examples:
 
-Focus on:
-- composition
-- balance
-- visual density
-- empty space
-- clustering
-- scale
-- distribution
-- color suggestions
-- creative progress
-- encouragement
+"Your coral creates a strong base.
+Adding a few fish higher up would create more depth."
 
-Do not criticize the user harshly.
+"The lower area is becoming dense.
+Consider placing the next fish school in the upper-right."
 
-Do not control Unity directly.
+"The fish are nicely distributed.
+A few bubbles above the coral could connect the composition."
 
-Only suggest safe, predefined actions.
+============================================================
+TAIWAN THEME
+============================================================
 
-Valid feedback types:
+For Taiwan scenes, consider:
+- lantern distribution
+- market atmosphere
+- vertical balance
+- lantern placement
+- open sky
+- visual hierarchy
+- warm focal areas
+
+Examples:
+
+"The lower market area is visually strong.
+Adding a few lanterns higher in the sky could balance
+the composition."
+
+"The lanterns are concentrated on one side.
+One or two smaller lanterns on the opposite side
+could improve balance."
+
+"The open sky gives the market scene breathing room.
+You do not need to fill all of it."
+
+============================================================
+FEEDBACK TYPES
+============================================================
+
+Use one of:
 - hint
 - encouragement
-- summary
 - strategy
+- review
 - warning
+- summary
+
+hint:
+A specific improvement.
+
+encouragement:
+A positive observation when something works.
+
+strategy:
+Higher-level creative direction.
+
+review:
+A broader evaluation of the current artwork.
+
+warning:
+Use only for a clear composition problem.
+
+summary:
+A concise overall evaluation.
+
+============================================================
+FEEDBACK QUALITY
+============================================================
+
+Avoid generic feedback such as:
+
+"Nice artwork!"
+
+"Keep creating!"
+
+"Your artwork looks good!"
+
+unless followed by a specific observation.
+
+Prefer:
+
+"Your coral creates a strong focal point in the lower-left.
+The upper-right is still open, so adding a small fish school
+there could improve visual balance."
+
+The ideal feedback contains:
+
+1. What you observed.
+2. Where it is.
+3. Why it matters.
+4. One useful suggestion.
+
+============================================================
+DO NOT OVER-CORRECT
+============================================================
+
+The goal is creative guidance, not perfection.
+
+Do not constantly tell the user to add something.
+
+Sometimes the correct feedback is:
+
+"The composition is already well balanced.
+The central fish school gives the artwork a clear
+focal point. I would leave the upper area relatively open."
+
+============================================================
+REVIEW MODE
+============================================================
+
+When the event is related to an artwork review,
+give a broader evaluation.
+
+Mention up to three useful observations.
+
+For example:
+
+"The composition has a strong focal point in the lower-left.
+The upper-right has considerable open space, while the
+middle area is becoming denser. Consider adding one
+small supporting element toward the upper-right."
+
+Do not produce a huge essay.
+
+============================================================
+ACTION RULES
+============================================================
 
 Valid actions:
 - none
@@ -111,15 +428,24 @@ Valid actions:
 - add_animation
 - show_summary
 
-For most feedback, use:
+Normally use:
+
 action.type = "none"
 
-Only suggest another action when it is genuinely useful.
+The AI should provide advice first.
 
-Return JSON in this structure:
+Do NOT directly control Unity.
+
+============================================================
+RESPONSE FORMAT
+============================================================
+
+Return ONLY valid JSON.
+
+Use this exact structure:
 
 {
-  "message": "short helpful feedback",
+  "message": "specific artistic feedback",
   "feedbackType": "hint",
   "action": {
     "type": "none",
@@ -130,7 +456,34 @@ Return JSON in this structure:
   "cooldownSeconds": 20
 }
 
-Keep the message concise.
+The message should normally be 1–3 sentences.
+
+For review feedback, it may be slightly longer.
+
+Do not use markdown.
+
+Do not use bullet points inside the message.
+
+============================================================
+FINAL PRINCIPLE
+============================================================
+
+Think like a thoughtful digital art teacher.
+
+Observe first.
+
+Explain what you see.
+
+Then give ONE useful creative suggestion.
+
+Be specific.
+
+Be encouraging.
+
+Be composition-aware.
+
+Never invent information that is not contained
+in the Unity artwork data.
 `;
 
 // ============================================================
@@ -193,13 +546,18 @@ function generateRequestId() {
     .toString("hex")}`;
 }
 
+// ============================================================
+// NORMALIZE AI RESPONSE
+// ============================================================
+
 function normalizeFeedback(feedback) {
   const validFeedbackTypes = [
     "hint",
     "encouragement",
-    "summary",
     "strategy",
-    "warning"
+    "review",
+    "warning",
+    "summary"
   ];
 
   const validActions = [
@@ -219,7 +577,7 @@ function normalizeFeedback(feedback) {
   const result = {
     message:
       typeof feedback?.message === "string"
-        ? feedback.message
+        ? feedback.message.trim()
         : "Keep exploring your composition.",
 
     feedbackType:
@@ -276,7 +634,7 @@ function generateMockFeedback(body) {
   if (eventType === "object_added") {
     return {
       message:
-        "Nice addition! Your new element is bringing more life and movement into the artwork.",
+        "Nice addition. The new element is helping build the composition.",
 
       feedbackType:
         "encouragement",
@@ -296,13 +654,33 @@ function generateMockFeedback(body) {
   if (eventType === "composition_update") {
     return {
       message:
-        "Your composition is developing nicely. Consider balancing the open space with another visual element.",
+        "Your composition is developing. Consider balancing the open space with another visual element.",
 
       feedbackType:
         "hint",
 
       action: {
         type: "show_composition_hint",
+        target: "",
+        value: ""
+      },
+
+      priority: "normal",
+
+      cooldownSeconds: 20
+    };
+  }
+
+  if (eventType === "artwork_review") {
+    return {
+      message:
+        "Your artwork has a developing focal point. Consider balancing the quieter area with one smaller supporting element.",
+
+      feedbackType:
+        "review",
+
+      action: {
+        type: "show_summary",
         target: "",
         value: ""
       },
@@ -333,6 +711,72 @@ function generateMockFeedback(body) {
 }
 
 // ============================================================
+// ROBUST OPENAI JSON PARSER
+// ============================================================
+
+function parseAIJson(outputText) {
+  if (!outputText || typeof outputText !== "string") {
+    throw new Error("OpenAI returned an empty response.");
+  }
+
+  let cleanedOutput = outputText.trim();
+
+  // ----------------------------------------------------------
+  // Remove Markdown code fences
+  // ----------------------------------------------------------
+
+  cleanedOutput = cleanedOutput
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+
+  // ----------------------------------------------------------
+  // Direct JSON parse
+  // ----------------------------------------------------------
+
+  try {
+    return JSON.parse(cleanedOutput);
+  }
+  catch (directParseError) {
+    // Continue to extraction below.
+  }
+
+  // ----------------------------------------------------------
+  // Extract JSON object if OpenAI added surrounding text
+  // ----------------------------------------------------------
+
+  const firstBrace =
+    cleanedOutput.indexOf("{");
+
+  const lastBrace =
+    cleanedOutput.lastIndexOf("}");
+
+  if (
+    firstBrace !== -1 &&
+    lastBrace > firstBrace
+  ) {
+    const jsonCandidate =
+      cleanedOutput.slice(
+        firstBrace,
+        lastBrace + 1
+      );
+
+    try {
+      return JSON.parse(jsonCandidate);
+    }
+    catch (extractedParseError) {
+      throw new Error(
+        "OpenAI returned text containing an invalid JSON object."
+      );
+    }
+  }
+
+  throw new Error(
+    "OpenAI response did not contain valid JSON."
+  );
+}
+
+// ============================================================
 // OPENAI FEEDBACK
 // ============================================================
 
@@ -347,23 +791,24 @@ async function generateAIFeedback(body) {
     );
   }
 
-  const userContent = JSON.stringify(
-    {
-      eventType:
-        body.eventType,
+  const userContent =
+    JSON.stringify(
+      {
+        eventType:
+          body.eventType,
 
-      sessionId:
-        body.sessionId,
+        sessionId:
+          body.sessionId,
 
-      occurredAtUtc:
-        body.occurredAtUtc,
+        occurredAtUtc:
+          body.occurredAtUtc,
 
-      context:
-        body.context || {}
-    },
-    null,
-    2
-  );
+        context:
+          body.context || {}
+      },
+      null,
+      2
+    );
 
   const response =
     await client.responses.create({
@@ -378,24 +823,34 @@ async function generateAIFeedback(body) {
     });
 
   const outputText =
-    response.output_text ||
-    "";
+    response.output_text || "";
 
   let parsed;
 
   try {
     parsed =
-      JSON.parse(outputText);
-  } catch (error) {
+      parseAIJson(outputText);
+  }
+  catch (error) {
     console.error(
-      "OpenAI returned non-JSON output:",
+      "[OPENAI JSON PARSE ERROR]"
+    );
+
+    console.error(
+      error.message
+    );
+
+    console.error(
+      "Raw OpenAI output:",
       outputText
     );
 
+    // IMPORTANT:
+    // Never put the raw JSON into "message".
+    // Unity would display it directly in the feedback panel.
     parsed = {
       message:
-        outputText ||
-        "Keep exploring your artwork.",
+        "I could not complete the artwork review right now. Please try again.",
 
       feedbackType:
         "encouragement",
@@ -414,7 +869,9 @@ async function generateAIFeedback(body) {
     };
   }
 
-  return normalizeFeedback(parsed);
+  return normalizeFeedback(
+    parsed
+  );
 }
 
 // ============================================================
@@ -437,7 +894,9 @@ app.get(
         CONFIG.mockAI,
 
       openaiConfigured:
-        Boolean(CONFIG.openaiApiKey),
+        Boolean(
+          CONFIG.openaiApiKey
+        ),
 
       model:
         CONFIG.openaiModel
@@ -446,32 +905,12 @@ app.get(
 );
 
 // ============================================================
-// DEBUG — LATEST UNITY + OPENAI DATA
-// ============================================================
-//
-// Open in Chrome:
-//
-// https://the-body-as-a-brush.onrender.com/api/debug/latest
-//
-// This shows:
-//
-// Unity
-//   ↓
-// Render
-//   ↓
-// OpenAI
-//   ↓
-// Render
-//
-// The data is stored only in server memory.
-// It disappears when Render restarts/redeploys.
-//
+// DEBUG ENDPOINT
 // ============================================================
 
 app.get(
   "/api/debug/latest",
   (req, res) => {
-
     if (
       !latestUnityPayload &&
       !latestAIResponse
@@ -503,7 +942,6 @@ app.get(
 app.post(
   "/api/feedback",
   async (req, res) => {
-
     const requestStartedAt =
       Date.now();
 
@@ -511,7 +949,6 @@ app.post(
       generateRequestId();
 
     try {
-
       // --------------------------------------------------------
       // BODY
       // --------------------------------------------------------
@@ -520,7 +957,7 @@ app.post(
         req.body;
 
       // --------------------------------------------------------
-      // LIVE DEBUG — STORE LATEST UNITY PAYLOAD
+      // STORE UNITY PAYLOAD
       // --------------------------------------------------------
 
       latestUnityPayload = {
@@ -531,7 +968,7 @@ app.post(
       };
 
       // --------------------------------------------------------
-      // BASIC VALIDATION
+      // VALIDATION
       // --------------------------------------------------------
 
       if (
@@ -607,7 +1044,7 @@ app.post(
       }
 
       // --------------------------------------------------------
-      // LOG UNITY REQUEST
+      // LOG REQUEST
       // --------------------------------------------------------
 
       console.log(
@@ -646,7 +1083,7 @@ app.post(
       );
 
       // --------------------------------------------------------
-      // GENERATE AI FEEDBACK
+      // GENERATE AI
       // --------------------------------------------------------
 
       const feedback =
@@ -655,7 +1092,7 @@ app.post(
         );
 
       // --------------------------------------------------------
-      // LIVE DEBUG — STORE LATEST OPENAI RESPONSE
+      // STORE RESPONSE
       // --------------------------------------------------------
 
       latestAIResponse = {
@@ -682,7 +1119,7 @@ app.post(
         requestStartedAt;
 
       // --------------------------------------------------------
-      // LOG AI RESPONSE
+      // LOG RESPONSE
       // --------------------------------------------------------
 
       console.log(
@@ -742,9 +1179,8 @@ app.post(
           cooldownSeconds:
             feedback.cooldownSeconds
         });
-
-    } catch (error) {
-
+    }
+    catch (error) {
       console.error(
         "\n[FEEDBACK] ERROR"
       );
@@ -776,12 +1212,12 @@ app.post(
 app.get(
   "/",
   (req, res) => {
-    res.status(200).send(
-      `
+    res.status(200).send(`
       <!DOCTYPE html>
       <html>
       <head>
         <title>The Body as a Brush</title>
+
         <style>
           body {
             font-family: Arial, sans-serif;
@@ -814,12 +1250,8 @@ app.get(
       </head>
 
       <body>
-
         <div class="card">
-
-          <h1>
-            The Body as a Brush
-          </h1>
+          <h1>The Body as a Brush</h1>
 
           <p>
             AI feedback backend is running.
@@ -838,13 +1270,10 @@ app.get(
               /api/debug/latest
             </a>
           </p>
-
         </div>
-
       </body>
       </html>
-      `
-    );
+    `);
   }
 );
 
@@ -859,7 +1288,6 @@ app.use(
     res,
     next
   ) => {
-
     console.error(
       "[SERVER ERROR]",
       err
@@ -887,7 +1315,6 @@ app.use(
 app.listen(
   CONFIG.port,
   () => {
-
     console.log(
       "\n============================================================"
     );
@@ -924,17 +1351,17 @@ app.listen(
 
     console.log(
       "Health endpoint:",
-      `/api/health`
+      "/api/health"
     );
 
     console.log(
       "Feedback endpoint:",
-      `/api/feedback`
+      "/api/feedback"
     );
 
     console.log(
       "Debug endpoint:",
-      `/api/debug/latest`
+      "/api/debug/latest"
     );
 
     console.log(
