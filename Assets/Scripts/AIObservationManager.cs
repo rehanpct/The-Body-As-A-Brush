@@ -11,7 +11,7 @@ public class AIObservationManager : MonoBehaviour
 
     [Header("Observation Settings")]
     [SerializeField]
-    private float observationInterval = 10f;
+    private float observationInterval = 20f;
 
     [SerializeField]
     private int minimumElementChange = 1;
@@ -30,6 +30,10 @@ public class AIObservationManager : MonoBehaviour
     private float lastBottomDensity;
 
     private bool hasPreviousSnapshot = false;
+
+    // =========================================================
+    // START
+    // =========================================================
 
     private void Start()
     {
@@ -51,7 +55,10 @@ public class AIObservationManager : MonoBehaviour
         if (enableDebugLogs)
         {
             Debug.Log(
-                "[AIObservationManager] Started."
+                "[AIObservationManager] Started. " +
+                "Observation interval: " +
+                observationInterval +
+                " seconds."
             );
         }
 
@@ -72,6 +79,10 @@ public class AIObservationManager : MonoBehaviour
         }
     }
 
+    // =========================================================
+    // UPDATE
+    // =========================================================
+
     private void Update()
     {
         if (Time.time < nextObservationTime)
@@ -82,8 +93,20 @@ public class AIObservationManager : MonoBehaviour
         nextObservationTime =
             Time.time + observationInterval;
 
+        if (enableDebugLogs)
+        {
+            Debug.Log(
+                "[AIObservationManager] " +
+                "20-second observation triggered."
+            );
+        }
+
         ObserveArtwork();
     }
+
+    // =========================================================
+    // OBSERVE ARTWORK
+    // =========================================================
 
     private void ObserveArtwork()
     {
@@ -145,6 +168,10 @@ public class AIObservationManager : MonoBehaviour
         );
     }
 
+    // =========================================================
+    // MEANINGFUL CHANGE
+    // =========================================================
+
     private bool HasMeaningfulChange(
         CompositionAnalyzer.CompositionSnapshot snapshot
     )
@@ -196,6 +223,10 @@ public class AIObservationManager : MonoBehaviour
 
         return false;
     }
+
+    // =========================================================
+    // UPDATE PREVIOUS SNAPSHOT
+    // =========================================================
 
     private void UpdatePreviousSnapshot(
         CompositionAnalyzer.CompositionSnapshot snapshot

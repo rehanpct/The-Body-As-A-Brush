@@ -36,6 +36,23 @@ public class ArtworkActionHistory : MonoBehaviour
             " | Total actions: " +
             actionHistory.Count
         );
+
+        // =====================================================
+        // CENTRAL AI FEEDBACK TRIGGER
+        // =====================================================
+        //
+        // Every artwork creation that uses RegisterAction()
+        // can now trigger the AI feedback system.
+        //
+        // AIFeedbackClient handles the cooldown, so this does
+        // not send unlimited requests.
+        // =====================================================
+
+        if (AIFeedbackClient.Instance != null)
+        {
+            AIFeedbackClient.Instance
+                .RequestFeedback("object_added");
+        }
     }
 
     // =========================================================
@@ -62,12 +79,25 @@ public class ArtworkActionHistory : MonoBehaviour
 
         if (artwork != null)
         {
+            string removedArtworkName =
+                artwork.name;
+
             Destroy(artwork);
 
             Debug.Log(
                 "UNDO: Removed artwork piece: " +
-                artwork.name
+                removedArtworkName
             );
+
+            // =================================================
+            // AI FEEDBACK FOR UNDO
+            // =================================================
+
+            if (AIFeedbackClient.Instance != null)
+            {
+                AIFeedbackClient.Instance
+                    .RequestFeedback("object_deleted");
+            }
         }
     }
 
@@ -98,11 +128,16 @@ public class ArtworkActionHistory : MonoBehaviour
         actionHistory.Clear();
     }
 
+    // =========================================================
+    // ACTION COUNT
+    // =========================================================
+
     public int ActionCount
     {
         get
         {
             RemoveDestroyedActions();
+
             return actionHistory.Count;
         }
     }

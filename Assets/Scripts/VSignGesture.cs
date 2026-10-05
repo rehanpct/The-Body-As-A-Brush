@@ -273,7 +273,7 @@ public class VSignGesture : MonoBehaviour
         }
 
         // =====================================================
-        // REGISTER FOR UNDO
+        // REGISTER FOR UNDO + CENTRAL AI FEEDBACK
         // =====================================================
 
         if (ArtworkActionHistory.Instance != null)
@@ -282,16 +282,6 @@ public class VSignGesture : MonoBehaviour
                 .RegisterAction(
                     fishSchool
                 );
-        }
-
-        // =====================================================
-        // AI FEEDBACK (Phase 1 Trigger)
-        // =====================================================
-
-        if (AIFeedbackClient.Instance != null)
-        {
-            AIFeedbackClient.Instance
-                .RequestFeedback("object_added");
         }
 
         if (ArtworkStatistics.Instance != null)
@@ -402,7 +392,7 @@ public class VSignGesture : MonoBehaviour
         }
 
         // =====================================================
-        // REGISTER FOR UNDO
+        // REGISTER FOR UNDO + CENTRAL AI FEEDBACK
         // =====================================================
 
         if (ArtworkActionHistory.Instance != null)
