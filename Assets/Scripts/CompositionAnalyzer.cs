@@ -4,31 +4,51 @@ using UnityEngine;
 
 public class CompositionAnalyzer : MonoBehaviour
 {
+    public static CompositionAnalyzer Instance;
+
+    // =========================================================
+    // ELEMENT INFORMATION
+    // =========================================================
+
     [Serializable]
     public class ElementInfo
     {
         public string type;
 
         public Vector2 normalizedPosition;
+
         public Vector2 normalizedSize;
 
         public float width;
+
         public float height;
 
         public float relativeSize;
     }
 
+    // =========================================================
+    // EMPTY SPACE INFORMATION
+    // =========================================================
+
     [Serializable]
     public class EmptySpaceInfo
     {
         public float left;
+
         public float right;
+
         public float top;
+
         public float bottom;
 
         public string largestEmptyRegion;
+
         public float largestEmptyPercentage;
     }
+
+    // =========================================================
+    // COMPOSITION SNAPSHOT
+    // =========================================================
 
     [Serializable]
     public class CompositionSnapshot
@@ -36,25 +56,36 @@ public class CompositionAnalyzer : MonoBehaviour
         public int totalElements;
 
         public float leftDensity;
+
         public float rightDensity;
+
         public float topDensity;
+
         public float bottomDensity;
 
         public EmptySpaceInfo emptySpace =
             new EmptySpaceInfo();
 
         public bool hasLargeObject;
+
         public string largeObjectType;
+
         public float largestObjectPercentage;
 
         public bool hasCluster;
+
         public float averageDistance;
 
         public List<ElementInfo> elements =
             new List<ElementInfo>();
     }
 
+    // =========================================================
+    // ARTWORK AREA
+    // =========================================================
+
     [Header("Artwork Area")]
+
     [SerializeField]
     private float minX = -10f;
 
@@ -67,7 +98,12 @@ public class CompositionAnalyzer : MonoBehaviour
     [SerializeField]
     private float maxY = 5.6f;
 
+    // =========================================================
+    // ANALYSIS SETTINGS
+    // =========================================================
+
     [Header("Analysis")]
+
     [SerializeField]
     private float clusterDistance = 2.0f;
 
@@ -79,6 +115,22 @@ public class CompositionAnalyzer : MonoBehaviour
 
     [SerializeField]
     private int gridRows = 3;
+
+    // =========================================================
+    // AWAKE
+    // =========================================================
+
+    private void Awake()
+    {
+        if (Instance != null &&
+            Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
+        Instance = this;
+    }
 
     // =========================================================
     // MAIN ANALYSIS
@@ -99,8 +151,11 @@ public class CompositionAnalyzer : MonoBehaviour
 
         foreach (GameObject obj in objects)
         {
-            if (obj != null)
+            if (obj != null &&
+                obj.activeInHierarchy)
+            {
                 validObjects.Add(obj);
+            }
         }
 
         snapshot.totalElements =
@@ -111,40 +166,52 @@ public class CompositionAnalyzer : MonoBehaviour
             return snapshot;
         }
 
-        // -----------------------------------------------------
-        // CALCULATE TOTAL ARTWORK AREA
-        // -----------------------------------------------------
+        // =====================================================
+        // ARTWORK AREA
+        // =====================================================
 
         float artworkWidth =
-            Mathf.Abs(maxX - minX);
+            Mathf.Abs(
+                maxX - minX
+            );
 
         float artworkHeight =
-            Mathf.Abs(maxY - minY);
+            Mathf.Abs(
+                maxY - minY
+            );
 
         float artworkArea =
-            artworkWidth * artworkHeight;
+            artworkWidth *
+            artworkHeight;
 
-        // -----------------------------------------------------
-        // DENSITY
-        // -----------------------------------------------------
+        // =====================================================
+        // DENSITY COUNTERS
+        // =====================================================
 
         int leftCount = 0;
+
         int rightCount = 0;
+
         int topCount = 0;
+
         int bottomCount = 0;
 
-        // -----------------------------------------------------
-        // LARGE OBJECT
-        // -----------------------------------------------------
+        // =====================================================
+        // LARGEST OBJECT
+        // =====================================================
 
         float largestArea = 0f;
+
         string largestType = "";
 
-        // -----------------------------------------------------
-        // OBJECT INFORMATION
-        // -----------------------------------------------------
+        // =====================================================
+        // ANALYZE EVERY OBJECT
+        // =====================================================
 
-        foreach (GameObject obj in validObjects)
+        foreach (
+            GameObject obj
+            in validObjects
+        )
         {
             Bounds bounds =
                 CalculateWorldBounds(obj);
@@ -154,6 +221,10 @@ public class CompositionAnalyzer : MonoBehaviour
 
             Vector3 size =
                 bounds.size;
+
+            // -------------------------------------------------
+            // NORMALIZED POSITION
+            // -------------------------------------------------
 
             float normalizedX =
                 Mathf.InverseLerp(
@@ -169,23 +240,45 @@ public class CompositionAnalyzer : MonoBehaviour
                     center.y
                 );
 
+            // -------------------------------------------------
+            // NORMALIZED SIZE
+            // -------------------------------------------------
+
             float normalizedWidth =
                 Mathf.Clamp01(
-                    size.x / artworkWidth
+                    size.x /
+                    Mathf.Max(
+                        artworkWidth,
+                        0.0001f
+                    )
                 );
 
             float normalizedHeight =
                 Mathf.Clamp01(
-                    size.y / artworkHeight
+                    size.y /
+                    Mathf.Max(
+                        artworkHeight,
+                        0.0001f
+                    )
                 );
 
+            // -------------------------------------------------
+            // OBJECT AREA
+            // -------------------------------------------------
+
             float objectArea =
-                size.x * size.y;
+                size.x *
+                size.y;
 
             float relativeArea =
                 artworkArea > 0f
-                    ? objectArea / artworkArea
+                    ? objectArea /
+                      artworkArea
                     : 0f;
+
+            // -------------------------------------------------
+            // ELEMENT INFO
+            // -------------------------------------------------
 
             ElementInfo info =
                 new ElementInfo();
@@ -214,31 +307,42 @@ public class CompositionAnalyzer : MonoBehaviour
             info.relativeSize =
                 relativeArea;
 
-            snapshot.elements.Add(info);
+            snapshot.elements.Add(
+                info
+            );
 
             // -------------------------------------------------
             // LEFT / RIGHT
             // -------------------------------------------------
 
             if (normalizedX < 0.5f)
+            {
                 leftCount++;
+            }
             else
+            {
                 rightCount++;
+            }
 
             // -------------------------------------------------
             // TOP / BOTTOM
             // -------------------------------------------------
 
             if (normalizedY >= 0.5f)
+            {
                 topCount++;
+            }
             else
+            {
                 bottomCount++;
+            }
 
             // -------------------------------------------------
             // LARGEST OBJECT
             // -------------------------------------------------
 
-            if (objectArea > largestArea)
+            if (objectArea >
+                largestArea)
             {
                 largestArea =
                     objectArea;
@@ -248,9 +352,9 @@ public class CompositionAnalyzer : MonoBehaviour
             }
         }
 
-        // -----------------------------------------------------
-        // DENSITY VALUES
-        // -----------------------------------------------------
+        // =====================================================
+        // DENSITY
+        // =====================================================
 
         snapshot.leftDensity =
             (float)leftCount /
@@ -268,35 +372,41 @@ public class CompositionAnalyzer : MonoBehaviour
             (float)bottomCount /
             validObjects.Count;
 
-        // -----------------------------------------------------
+        // =====================================================
         // LARGE OBJECT
-        // -----------------------------------------------------
+        // =====================================================
 
         snapshot.largestObjectPercentage =
             largestArea /
-            Mathf.Max(artworkArea, 0.0001f);
+            Mathf.Max(
+                artworkArea,
+                0.0001f
+            );
 
-        if (snapshot.largestObjectPercentage >=
-            largeObjectPercentage)
+        if (
+            snapshot.largestObjectPercentage >=
+            largeObjectPercentage
+        )
         {
-            snapshot.hasLargeObject = true;
+            snapshot.hasLargeObject =
+                true;
 
             snapshot.largeObjectType =
                 largestType;
         }
 
-        // -----------------------------------------------------
+        // =====================================================
         // EMPTY SPACE
-        // -----------------------------------------------------
+        // =====================================================
 
         snapshot.emptySpace =
             CalculateEmptySpace(
                 validObjects
             );
 
-        // -----------------------------------------------------
+        // =====================================================
         // CLUSTERING
-        // -----------------------------------------------------
+        // =====================================================
 
         CalculateClustering(
             validObjects,
@@ -330,9 +440,11 @@ public class CompositionAnalyzer : MonoBehaviour
         Bounds bounds =
             renderers[0].bounds;
 
-        for (int i = 1;
-             i < renderers.Length;
-             i++)
+        for (
+            int i = 1;
+            i < renderers.Length;
+            i++
+        )
         {
             if (renderers[i] != null)
             {
@@ -362,7 +474,10 @@ public class CompositionAnalyzer : MonoBehaviour
                 gridRows
             ];
 
-        foreach (GameObject obj in objects)
+        foreach (
+            GameObject obj
+            in objects
+        )
         {
             Bounds bounds =
                 CalculateWorldBounds(obj);
@@ -410,9 +525,9 @@ public class CompositionAnalyzer : MonoBehaviour
             ]++;
         }
 
-        // -----------------------------------------------------
+        // =====================================================
         // COUNT EMPTY CELLS
-        // -----------------------------------------------------
+        // =====================================================
 
         int totalCells =
             gridColumns *
@@ -421,36 +536,71 @@ public class CompositionAnalyzer : MonoBehaviour
         int emptyCells = 0;
 
         int leftEmpty = 0;
+
         int rightEmpty = 0;
+
         int topEmpty = 0;
+
         int bottomEmpty = 0;
 
         int largestEmptyRun = 0;
+
         string largestRegion = "";
 
-        for (int x = 0;
-             x < gridColumns;
-             x++)
+        for (
+            int x = 0;
+            x < gridColumns;
+            x++
+        )
         {
-            for (int y = 0;
-                 y < gridRows;
-                 y++)
+            for (
+                int y = 0;
+                y < gridRows;
+                y++
+            )
             {
-                if (occupied[x, y] == 0)
+                if (
+                    occupied[x, y] ==
+                    0
+                )
                 {
                     emptyCells++;
 
-                    if (x < gridColumns / 2)
+                    // -----------------------------------------
+                    // LEFT / RIGHT EMPTY
+                    // -----------------------------------------
+
+                    if (
+                        x <
+                        gridColumns / 2
+                    )
+                    {
                         leftEmpty++;
-
+                    }
                     else
+                    {
                         rightEmpty++;
+                    }
 
-                    if (y >= gridRows / 2)
+                    // -----------------------------------------
+                    // TOP / BOTTOM EMPTY
+                    // -----------------------------------------
+
+                    if (
+                        y >=
+                        gridRows / 2
+                    )
+                    {
                         topEmpty++;
-
+                    }
                     else
+                    {
                         bottomEmpty++;
+                    }
+
+                    // -----------------------------------------
+                    // LARGEST EMPTY REGION
+                    // -----------------------------------------
 
                     int emptyNeighbours =
                         CountEmptyNeighbours(
@@ -459,8 +609,10 @@ public class CompositionAnalyzer : MonoBehaviour
                             y
                         );
 
-                    if (emptyNeighbours >
-                        largestEmptyRun)
+                    if (
+                        emptyNeighbours >
+                        largestEmptyRun
+                    )
                     {
                         largestEmptyRun =
                             emptyNeighbours;
@@ -474,6 +626,10 @@ public class CompositionAnalyzer : MonoBehaviour
                 }
             }
         }
+
+        // =====================================================
+        // EMPTY RATIOS
+        // =====================================================
 
         result.left =
             (float)leftEmpty /
@@ -538,21 +694,37 @@ public class CompositionAnalyzer : MonoBehaviour
         int height =
             occupied.GetLength(1);
 
-        if (x > 0 &&
-            occupied[x - 1, y] == 0)
+        if (
+            x > 0 &&
+            occupied[x - 1, y] == 0
+        )
+        {
             count++;
+        }
 
-        if (x < width - 1 &&
-            occupied[x + 1, y] == 0)
+        if (
+            x < width - 1 &&
+            occupied[x + 1, y] == 0
+        )
+        {
             count++;
+        }
 
-        if (y > 0 &&
-            occupied[x, y - 1] == 0)
+        if (
+            y > 0 &&
+            occupied[x, y - 1] == 0
+        )
+        {
             count++;
+        }
 
-        if (y < height - 1 &&
-            occupied[x, y + 1] == 0)
+        if (
+            y < height - 1 &&
+            occupied[x, y + 1] == 0
+        )
+        {
             count++;
+        }
 
         return count;
     }
@@ -591,17 +763,31 @@ public class CompositionAnalyzer : MonoBehaviour
     )
     {
         if (objects.Count < 2)
+        {
             return;
+        }
 
         float totalDistance = 0f;
+
         int pairCount = 0;
 
-        foreach (GameObject first in objects)
+        foreach (
+            GameObject first
+            in objects
+        )
         {
-            foreach (GameObject second in objects)
+            foreach (
+                GameObject second
+                in objects
+            )
             {
-                if (first == second)
+                if (
+                    first ==
+                    second
+                )
+                {
                     continue;
+                }
 
                 float distance =
                     Vector3.Distance(
@@ -614,8 +800,10 @@ public class CompositionAnalyzer : MonoBehaviour
 
                 pairCount++;
 
-                if (distance <=
-                    clusterDistance)
+                if (
+                    distance <=
+                    clusterDistance
+                )
                 {
                     snapshot.hasCluster =
                         true;
@@ -642,26 +830,56 @@ public class CompositionAnalyzer : MonoBehaviour
         string objectName =
             obj.name.ToLower();
 
-        if (objectName.Contains("fish"))
+        if (
+            objectName.Contains(
+                "fish"
+            )
+        )
+        {
             return "fish";
+        }
 
-        if (objectName.Contains("coral"))
+        if (
+            objectName.Contains(
+                "coral"
+            )
+        )
+        {
             return "coral";
+        }
 
-        if (objectName.Contains("bubble"))
+        if (
+            objectName.Contains(
+                "bubble"
+            )
+        )
+        {
             return "bubble";
+        }
 
-        if (objectName.Contains("water"))
+        if (
+            objectName.Contains(
+                "water"
+            )
+        )
+        {
             return "water";
+        }
 
-        if (objectName.Contains("lantern"))
+        if (
+            objectName.Contains(
+                "lantern"
+            )
+        )
+        {
             return "lantern";
+        }
 
         return "unknown";
     }
 
     // =========================================================
-    // DEBUG
+    // DEBUG ANALYSIS
     // =========================================================
 
     public void DebugAnalyze()
@@ -733,12 +951,14 @@ public class CompositionAnalyzer : MonoBehaviour
 
         Debug.Log(
             "Largest Empty Region: " +
-            snapshot.emptySpace.largestEmptyRegion
+            snapshot.emptySpace
+                .largestEmptyRegion
         );
 
         Debug.Log(
             "Empty Space %: " +
-            snapshot.emptySpace.largestEmptyPercentage
+            snapshot.emptySpace
+                .largestEmptyPercentage
         );
 
         Debug.Log(

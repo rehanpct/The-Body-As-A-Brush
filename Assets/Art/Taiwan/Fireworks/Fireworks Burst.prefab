@@ -10,6 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 5893710193406508389}
   - component: {fileID: 8687897652410346366}
+  - component: {fileID: -4088326688255195495}
   m_Layer: 0
   m_Name: Fireworks Burst
   m_TagString: ArtworkElement
@@ -91,3 +92,18 @@ SpriteRenderer:
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
+--- !u!114 &-4088326688255195495
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5547426177492385721}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 60e3bb524b61c0f408291efede3d1e41, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FireworkAnimation
+  startScale: 0.3
+  endScale: 1.15
+  duration: 3

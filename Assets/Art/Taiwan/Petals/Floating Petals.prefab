@@ -10,6 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 653542174464756930}
   - component: {fileID: 7685186052856161495}
+  - component: {fileID: 8209058429084606790}
   m_Layer: 0
   m_Name: Floating Petals
   m_TagString: ArtworkElement
@@ -27,7 +28,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0.6, y: 0.6, z: 1}
+  m_LocalScale: {x: 0.4, y: 0.4, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -91,3 +92,21 @@ SpriteRenderer:
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
+--- !u!114 &8209058429084606790
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8130969554572087621}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7debf0e647c3e2d48a8685e45979f993, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PetalFloat
+  fallSpeed: 0.18
+  driftAmount: 0.12
+  driftSpeed: 0.7
+  rotationSpeed: 18
+  resetHeight: -5
+  topHeight: 5

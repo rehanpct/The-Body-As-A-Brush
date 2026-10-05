@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
 using UnityEngine.Networking;
@@ -14,7 +15,12 @@ public class AIFeedbackClient : MonoBehaviour
     // ============================================================
 
     [Header("Render Backend")]
-    [Tooltip("POST endpoint on Render. Never put an OpenAI key here.")]
+
+    [Tooltip(
+        "POST endpoint on Render. " +
+        "Never put an OpenAI API key in Unity."
+    )]
+
     [SerializeField]
     private string renderUrl =
         "https://the-body-as-a-brush.onrender.com/api/feedback";
@@ -24,7 +30,11 @@ public class AIFeedbackClient : MonoBehaviour
     // ============================================================
 
     [Header("Cooldown")]
-    [Tooltip("Minimum seconds between AI requests.")]
+
+    [Tooltip(
+        "Minimum seconds between AI requests."
+    )]
+
     [SerializeField]
     private float minimumCooldownSeconds = 20f;
 
@@ -83,6 +93,26 @@ public class AIFeedbackClient : MonoBehaviour
     }
 
     // ============================================================
+    // COMPOSITION ELEMENT
+    // ============================================================
+
+    [Serializable]
+    private class CompositionElement
+    {
+        public string type;
+
+        public float normalizedX;
+
+        public float normalizedY;
+
+        public float width;
+
+        public float height;
+
+        public float relativeSize;
+    }
+
+    // ============================================================
     // COMPOSITION CONTEXT
     // ============================================================
 
@@ -122,6 +152,9 @@ public class AIFeedbackClient : MonoBehaviour
         public bool hasCluster;
 
         public float averageDistance;
+
+        public List<CompositionElement> elements =
+            new List<CompositionElement>();
     }
 
     // ============================================================
@@ -202,8 +235,10 @@ public class AIFeedbackClient : MonoBehaviour
 
     private void Awake()
     {
-        if (Instance != null &&
-            Instance != this)
+        if (
+            Instance != null &&
+            Instance != this
+        )
         {
             Destroy(gameObject);
             return;
@@ -221,7 +256,8 @@ public class AIFeedbackClient : MonoBehaviour
             minimumCooldownSeconds;
 
         Debug.Log(
-            "[AIFeedbackClient] Initialised. Session: " +
+            "[AIFeedbackClient] " +
+            "Initialised. Session: " +
             sessionId
         );
     }
@@ -238,30 +274,21 @@ public class AIFeedbackClient : MonoBehaviour
         {
             Debug.Log(
                 "[AIFeedbackClient] " +
-                "Skipped — request in progress."
+                "Skipped — request already in progress."
             );
 
             return;
         }
 
-        float timeSinceLast =
-            Time.time - lastRequestTime;
-
-        if (timeSinceLast < currentCooldown)
+        if (!CanSendRequest())
         {
-            Debug.Log(
-                "[AIFeedbackClient] " +
-                "Skipped — cooldown. " +
-                (currentCooldown - timeSinceLast)
-                    .ToString("F1") +
-                "s remaining."
-            );
-
             return;
         }
 
         StartCoroutine(
-            SendFeedbackRequest(eventType)
+            SendFeedbackRequest(
+                eventType
+            )
         );
     }
 
@@ -294,23 +321,102 @@ public class AIFeedbackClient : MonoBehaviour
             return;
         }
 
-        float timeSinceLast =
-            Time.time - lastRequestTime;
+        if (!CanSendRequest())
+        {
+            return;
+        }
 
-        if (timeSinceLast < currentCooldown)
+        StartCoroutine(
+            SendCompositionRequest(
+                snapshot
+            )
+        );
+    }
+
+    // ============================================================
+    // ARTWORK REVIEW
+    // ============================================================
+
+    public void RequestArtworkReview()
+    {
+        if (isRequestInProgress)
         {
             Debug.Log(
                 "[AIFeedbackClient] " +
-                "Composition request skipped — " +
-                "cooldown."
+                "Review skipped — " +
+                "request already in progress."
+            );
+
+            return;
+        }
+
+        if (!CanSendRequest())
+        {
+            return;
+        }
+
+        if (
+            CompositionAnalyzer.Instance ==
+            null
+        )
+        {
+            Debug.LogWarning(
+                "[AIFeedbackClient] " +
+                "CompositionAnalyzer not found."
+            );
+
+            return;
+        }
+
+        CompositionAnalyzer.CompositionSnapshot snapshot =
+            CompositionAnalyzer.Instance.Analyze();
+
+        if (snapshot == null)
+        {
+            Debug.LogWarning(
+                "[AIFeedbackClient] " +
+                "Could not create artwork snapshot."
             );
 
             return;
         }
 
         StartCoroutine(
-            SendCompositionRequest(snapshot)
+            SendArtworkReview(
+                snapshot
+            )
         );
+    }
+
+    // ============================================================
+    // REQUEST COOLDOWN
+    // ============================================================
+
+    private bool CanSendRequest()
+    {
+        float timeSinceLast =
+            Time.time -
+            lastRequestTime;
+
+        if (
+            timeSinceLast <
+            currentCooldown
+        )
+        {
+            Debug.Log(
+                "[AIFeedbackClient] " +
+                "Skipped — cooldown. " +
+                (
+                    currentCooldown -
+                    timeSinceLast
+                ).ToString("F1") +
+                "s remaining."
+            );
+
+            return false;
+        }
+
+        return true;
     }
 
     // ============================================================
@@ -321,202 +427,131 @@ public class AIFeedbackClient : MonoBehaviour
         string objectType
     )
     {
-        FeedbackContext ctx =
+        FeedbackContext context =
             new FeedbackContext();
 
-        ctx.objectType =
+        context.objectType =
             objectType;
 
-        ctx.sessionElapsedSeconds =
-            Time.time - sessionStartTime;
+        context.sessionElapsedSeconds =
+            Time.time -
+            sessionStartTime;
 
-        if (ThemeManager.Instance != null)
+        // --------------------------------------------------------
+        // THEME
+        // --------------------------------------------------------
+
+        if (
+            ThemeManager.Instance !=
+            null
+        )
         {
-            ctx.currentTheme =
+            context.currentTheme =
                 ThemeManager.Instance
                     .CurrentTheme
                     .ToString();
         }
-
-        if (ArtworkActionHistory.Instance != null)
+        else
         {
-            ctx.totalObjectCount =
+            context.currentTheme =
+                "Unknown";
+        }
+
+        // --------------------------------------------------------
+        // ACTION HISTORY
+        // --------------------------------------------------------
+
+        if (
+            ArtworkActionHistory.Instance !=
+            null
+        )
+        {
+            context.totalObjectCount =
                 ArtworkActionHistory.Instance
                     .ActionCount;
         }
 
-        if (ArtworkStatistics.Instance != null)
+        // --------------------------------------------------------
+        // ARTWORK STATISTICS
+        // --------------------------------------------------------
+
+        if (
+            ArtworkStatistics.Instance !=
+            null
+        )
         {
-            ArtworkData d =
+            ArtworkData data =
                 ArtworkStatistics.Instance.data;
 
-            ctx.waterCount =
-                d.waterCount;
+            if (data != null)
+            {
+                context.waterCount =
+                    data.waterCount;
 
-            ctx.coralCount =
-                d.coralCount;
+                context.coralCount =
+                    data.coralCount;
 
-            ctx.fishSchoolCount =
-                d.fishSchoolCount;
+                context.fishSchoolCount =
+                    data.fishSchoolCount;
 
-            ctx.bubbleBurstCount =
-                d.bubbleBurstCount;
+                context.bubbleBurstCount =
+                    data.bubbleBurstCount;
 
-            ctx.lanternCount =
-                d.lanternCount;
+                context.lanternCount =
+                    data.lanternCount;
 
-            ctx.indexGestureCount =
-                d.indexGestureCount;
+                context.indexGestureCount =
+                    data.indexGestureCount;
 
-            ctx.vSignGestureCount =
-                d.vSignGestureCount;
+                context.vSignGestureCount =
+                    data.vSignGestureCount;
 
-            ctx.openPalmGestureCount =
-                d.openPalmGestureCount;
+                context.openPalmGestureCount =
+                    data.openPalmGestureCount;
 
-            ctx.thumbUpGestureCount =
-                d.thumbUpGestureCount;
+                context.thumbUpGestureCount =
+                    data.thumbUpGestureCount;
 
-            ctx.pauseTime =
-                d.pauseTime;
+                context.pauseTime =
+                    data.pauseTime;
+            }
         }
 
-        return ctx;
+        return context;
     }
 
     // ============================================================
-    // NORMAL FEEDBACK REQUEST
+    // BUILD COMPOSITION CONTEXT
     // ============================================================
 
-    private IEnumerator SendFeedbackRequest(
-        string eventType
-    )
-    {
-        isRequestInProgress = true;
-
-        string objectType =
-            eventType == "object_added"
-                ? "fish_school"
-                : eventType;
-
-        FeedbackRequest requestPayload =
-            new FeedbackRequest();
-
-        requestPayload.projectType =
-            "gesture_painting";
-
-        requestPayload.sessionId =
-            sessionId;
-
-        requestPayload.eventType =
-            eventType;
-
-        requestPayload.occurredAtUtc =
-            DateTime.UtcNow.ToString(
-                "yyyy-MM-ddTHH:mm:ssZ"
-            );
-
-        requestPayload.context =
-            BuildContext(objectType);
-
-        string json =
-            JsonUtility.ToJson(
-                requestPayload
-            );
-
-        byte[] rawBody =
-            Encoding.UTF8.GetBytes(json);
-
-        Debug.Log(
-            "[AIFeedbackClient] " +
-            "Sending '" +
-            eventType +
-            "' to " +
-            renderUrl
-        );
-
-        Debug.Log(
-            "[AIFeedbackClient] Payload: " +
-            json
-        );
-
-        using (UnityWebRequest webRequest =
-            new UnityWebRequest(
-                renderUrl,
-                "POST"
-            ))
-        {
-            webRequest.uploadHandler =
-                new UploadHandlerRaw(
-                    rawBody
-                );
-
-            webRequest.downloadHandler =
-                new DownloadHandlerBuffer();
-
-            webRequest.SetRequestHeader(
-                "Content-Type",
-                "application/json"
-            );
-
-            webRequest.timeout = 30;
-
-            yield return
-                webRequest.SendWebRequest();
-
-            isRequestInProgress =
-                false;
-
-            lastRequestTime =
-                Time.time;
-
-            if (webRequest.result ==
-                UnityWebRequest.Result.Success)
-            {
-                HandleAIResponse(
-                    webRequest.downloadHandler.text
-                );
-            }
-            else
-            {
-                Debug.LogError(
-                    "[AIFeedbackClient] " +
-                    "Request failed — " +
-                    webRequest.error +
-                    " (HTTP " +
-                    webRequest.responseCode +
-                    ")"
-                );
-            }
-        }
-    }
-
-    // ============================================================
-    // COMPOSITION REQUEST
-    // ============================================================
-
-    private IEnumerator SendCompositionRequest(
+    private CompositionContext BuildCompositionContext(
         CompositionAnalyzer.CompositionSnapshot snapshot
     )
     {
-        isRequestInProgress = true;
+        CompositionContext context =
+            new CompositionContext();
 
-        string currentTheme =
+        // --------------------------------------------------------
+        // THEME
+        // --------------------------------------------------------
+
+        context.currentTheme =
             "Unknown";
 
-        if (ThemeManager.Instance != null)
+        if (
+            ThemeManager.Instance !=
+            null
+        )
         {
-            currentTheme =
+            context.currentTheme =
                 ThemeManager.Instance
                     .CurrentTheme
                     .ToString();
         }
 
-        CompositionContext context =
-            new CompositionContext();
-
-        context.currentTheme =
-            currentTheme;
+        // --------------------------------------------------------
+        // BASIC COMPOSITION
+        // --------------------------------------------------------
 
         context.totalElements =
             snapshot.totalElements;
@@ -533,7 +568,14 @@ public class AIFeedbackClient : MonoBehaviour
         context.bottomDensity =
             snapshot.bottomDensity;
 
-        if (snapshot.emptySpace != null)
+        // --------------------------------------------------------
+        // EMPTY SPACE
+        // --------------------------------------------------------
+
+        if (
+            snapshot.emptySpace !=
+            null
+        )
         {
             context.emptyLeft =
                 snapshot.emptySpace.left;
@@ -556,6 +598,10 @@ public class AIFeedbackClient : MonoBehaviour
                     .largestEmptyPercentage;
         }
 
+        // --------------------------------------------------------
+        // LARGE OBJECT
+        // --------------------------------------------------------
+
         context.hasLargeObject =
             snapshot.hasLargeObject;
 
@@ -565,11 +611,197 @@ public class AIFeedbackClient : MonoBehaviour
         context.largestObjectPercentage =
             snapshot.largestObjectPercentage;
 
+        // --------------------------------------------------------
+        // CLUSTERING
+        // --------------------------------------------------------
+
         context.hasCluster =
             snapshot.hasCluster;
 
         context.averageDistance =
             snapshot.averageDistance;
+
+        // --------------------------------------------------------
+        // INDIVIDUAL ELEMENTS
+        // --------------------------------------------------------
+
+        if (
+            snapshot.elements !=
+            null
+        )
+        {
+            foreach (
+                CompositionAnalyzer.ElementInfo
+                element
+                in snapshot.elements
+            )
+            {
+                CompositionElement
+                    compositionElement =
+                    new CompositionElement();
+
+                compositionElement.type =
+                    element.type;
+
+                compositionElement.normalizedX =
+                    element.normalizedPosition.x;
+
+                compositionElement.normalizedY =
+                    element.normalizedPosition.y;
+
+                compositionElement.width =
+                    element.width;
+
+                compositionElement.height =
+                    element.height;
+
+                compositionElement.relativeSize =
+                    element.relativeSize;
+
+                context.elements.Add(
+                    compositionElement
+                );
+            }
+        }
+
+        return context;
+    }
+
+    // ============================================================
+    // NORMAL FEEDBACK REQUEST
+    // ============================================================
+
+    private IEnumerator SendFeedbackRequest(
+        string eventType
+    )
+    {
+        isRequestInProgress =
+            true;
+
+        string objectType =
+            eventType ==
+            "object_added"
+                ? "fish_school"
+                : eventType;
+
+        FeedbackRequest request =
+            new FeedbackRequest();
+
+        request.projectType =
+            "gesture_painting";
+
+        request.sessionId =
+            sessionId;
+
+        request.eventType =
+            eventType;
+
+        request.occurredAtUtc =
+            DateTime.UtcNow.ToString(
+                "yyyy-MM-ddTHH:mm:ssZ"
+            );
+
+        request.context =
+            BuildContext(
+                objectType
+            );
+
+        string json =
+            JsonUtility.ToJson(
+                request
+            );
+
+        byte[] rawBody =
+            Encoding.UTF8.GetBytes(
+                json
+            );
+
+        Debug.Log(
+            "[AIFeedbackClient] " +
+            "Sending '" +
+            eventType +
+            "' to Render."
+        );
+
+        Debug.Log(
+            "[AIFeedbackClient] " +
+            "Payload: " +
+            json
+        );
+
+        using (
+            UnityWebRequest webRequest =
+                new UnityWebRequest(
+                    renderUrl,
+                    "POST"
+                )
+        )
+        {
+            webRequest.uploadHandler =
+                new UploadHandlerRaw(
+                    rawBody
+                );
+
+            webRequest.downloadHandler =
+                new DownloadHandlerBuffer();
+
+            webRequest.SetRequestHeader(
+                "Content-Type",
+                "application/json"
+            );
+
+            webRequest.timeout =
+                30;
+
+            yield return
+                webRequest.SendWebRequest();
+
+            isRequestInProgress =
+                false;
+
+            lastRequestTime =
+                Time.time;
+
+            if (
+                webRequest.result ==
+                UnityWebRequest.Result.Success
+            )
+            {
+                HandleAIResponse(
+                    webRequest
+                        .downloadHandler
+                        .text
+                );
+            }
+            else
+            {
+                Debug.LogError(
+                    "[AIFeedbackClient] " +
+                    "Request failed — " +
+                    webRequest.error +
+                    " (HTTP " +
+                    webRequest.responseCode +
+                    ")"
+                );
+            }
+        }
+    }
+
+    // ============================================================
+    // COMPOSITION FEEDBACK REQUEST
+    // ============================================================
+
+    private IEnumerator SendCompositionRequest(
+        CompositionAnalyzer.CompositionSnapshot snapshot
+    )
+    {
+        isRequestInProgress =
+            true;
+
+        CompositionContext context =
+            BuildCompositionContext(
+                snapshot
+            );
 
         CompositionRequest request =
             new CompositionRequest();
@@ -592,10 +824,14 @@ public class AIFeedbackClient : MonoBehaviour
             context;
 
         string json =
-            JsonUtility.ToJson(request);
+            JsonUtility.ToJson(
+                request
+            );
 
         byte[] rawBody =
-            Encoding.UTF8.GetBytes(json);
+            Encoding.UTF8.GetBytes(
+                json
+            );
 
         Debug.Log(
             "[AIFeedbackClient] " +
@@ -608,11 +844,13 @@ public class AIFeedbackClient : MonoBehaviour
             json
         );
 
-        using (UnityWebRequest webRequest =
-            new UnityWebRequest(
-                renderUrl,
-                "POST"
-            ))
+        using (
+            UnityWebRequest webRequest =
+                new UnityWebRequest(
+                    renderUrl,
+                    "POST"
+                )
+        )
         {
             webRequest.uploadHandler =
                 new UploadHandlerRaw(
@@ -627,7 +865,8 @@ public class AIFeedbackClient : MonoBehaviour
                 "application/json"
             );
 
-            webRequest.timeout = 30;
+            webRequest.timeout =
+                30;
 
             yield return
                 webRequest.SendWebRequest();
@@ -638,20 +877,23 @@ public class AIFeedbackClient : MonoBehaviour
             lastRequestTime =
                 Time.time;
 
-            if (webRequest.result ==
-                UnityWebRequest.Result.Success)
+            if (
+                webRequest.result ==
+                UnityWebRequest.Result.Success
+            )
             {
-                string responseText =
-                    webRequest.downloadHandler.text;
-
                 Debug.Log(
                     "[AIFeedbackClient] " +
                     "Composition response: " +
-                    responseText
+                    webRequest
+                        .downloadHandler
+                        .text
                 );
 
                 HandleAIResponse(
-                    responseText
+                    webRequest
+                        .downloadHandler
+                        .text
                 );
             }
             else
@@ -669,6 +911,129 @@ public class AIFeedbackClient : MonoBehaviour
     }
 
     // ============================================================
+    // ARTWORK REVIEW REQUEST
+    // ============================================================
+
+    private IEnumerator SendArtworkReview(
+        CompositionAnalyzer.CompositionSnapshot snapshot
+    )
+    {
+        isRequestInProgress =
+            true;
+
+        CompositionContext context =
+            BuildCompositionContext(
+                snapshot
+            );
+
+        CompositionRequest request =
+            new CompositionRequest();
+
+        request.projectType =
+            "gesture_painting";
+
+        request.sessionId =
+            sessionId;
+
+        request.eventType =
+            "artwork_review";
+
+        request.occurredAtUtc =
+            DateTime.UtcNow.ToString(
+                "yyyy-MM-ddTHH:mm:ssZ"
+            );
+
+        request.context =
+            context;
+
+        string json =
+            JsonUtility.ToJson(
+                request
+            );
+
+        byte[] rawBody =
+            Encoding.UTF8.GetBytes(
+                json
+            );
+
+        Debug.Log(
+            "[AIFeedbackClient] " +
+            "Sending artwork_review."
+        );
+
+        Debug.Log(
+            "[AIFeedbackClient] " +
+            "Review Payload: " +
+            json
+        );
+
+        using (
+            UnityWebRequest webRequest =
+                new UnityWebRequest(
+                    renderUrl,
+                    "POST"
+                )
+        )
+        {
+            webRequest.uploadHandler =
+                new UploadHandlerRaw(
+                    rawBody
+                );
+
+            webRequest.downloadHandler =
+                new DownloadHandlerBuffer();
+
+            webRequest.SetRequestHeader(
+                "Content-Type",
+                "application/json"
+            );
+
+            webRequest.timeout =
+                30;
+
+            yield return
+                webRequest.SendWebRequest();
+
+            isRequestInProgress =
+                false;
+
+            lastRequestTime =
+                Time.time;
+
+            if (
+                webRequest.result ==
+                UnityWebRequest.Result.Success
+            )
+            {
+                Debug.Log(
+                    "[AIFeedbackClient] " +
+                    "Artwork review response: " +
+                    webRequest
+                        .downloadHandler
+                        .text
+                );
+
+                HandleAIResponse(
+                    webRequest
+                        .downloadHandler
+                        .text
+                );
+            }
+            else
+            {
+                Debug.LogError(
+                    "[AIFeedbackClient] " +
+                    "Artwork review failed — " +
+                    webRequest.error +
+                    " (HTTP " +
+                    webRequest.responseCode +
+                    ")"
+                );
+            }
+        }
+    }
+
+    // ============================================================
     // HANDLE AI RESPONSE
     // ============================================================
 
@@ -676,7 +1041,11 @@ public class AIFeedbackClient : MonoBehaviour
         string responseText
     )
     {
-        if (string.IsNullOrEmpty(responseText))
+        if (
+            string.IsNullOrEmpty(
+                responseText
+            )
+        )
         {
             Debug.LogWarning(
                 "[AIFeedbackClient] " +
@@ -691,11 +1060,15 @@ public class AIFeedbackClient : MonoBehaviour
         try
         {
             response =
-                JsonUtility.FromJson<FeedbackResponse>(
+                JsonUtility.FromJson<
+                    FeedbackResponse
+                >(
                     responseText
                 );
         }
-        catch (Exception exception)
+        catch (
+            Exception exception
+        )
         {
             Debug.LogError(
                 "[AIFeedbackClient] " +
@@ -716,7 +1089,14 @@ public class AIFeedbackClient : MonoBehaviour
             return;
         }
 
-        if (response.cooldownSeconds > 0)
+        // ========================================================
+        // UPDATE COOLDOWN
+        // ========================================================
+
+        if (
+            response.cooldownSeconds >
+            0
+        )
         {
             currentCooldown =
                 Mathf.Max(
@@ -725,15 +1105,27 @@ public class AIFeedbackClient : MonoBehaviour
                 );
         }
 
-        if (string.IsNullOrEmpty(response.message))
+        // ========================================================
+        // MESSAGE VALIDATION
+        // ========================================================
+
+        if (
+            string.IsNullOrEmpty(
+                response.message
+            )
+        )
         {
             Debug.LogWarning(
                 "[AIFeedbackClient] " +
-                "Response message was empty."
+                "AI response message was empty."
             );
 
             return;
         }
+
+        // ========================================================
+        // DEBUG INFORMATION
+        // ========================================================
 
         Debug.Log(
             "[AIFeedbackClient] " +
@@ -741,17 +1133,74 @@ public class AIFeedbackClient : MonoBehaviour
             response.message
         );
 
-        if (AIFeedbackPanel.Instance != null)
-        {
-            int displayDuration =
-                response.cooldownSeconds > 0
-                    ? response.cooldownSeconds
-                    : (int)minimumCooldownSeconds;
+        Debug.Log(
+            "[AIFeedbackClient] " +
+            "FEEDBACK TYPE: " +
+            response.feedbackType
+        );
 
-            AIFeedbackPanel.Instance.ShowFeedback(
-                response.message,
-                displayDuration
+        Debug.Log(
+            "[AIFeedbackClient] " +
+            "PRIORITY: " +
+            response.priority
+        );
+
+        if (
+            response.action !=
+            null
+        )
+        {
+            Debug.Log(
+                "[AIFeedbackClient] " +
+                "ACTION: " +
+                response.action.type
             );
+
+            Debug.Log(
+                "[AIFeedbackClient] " +
+                "ACTION TARGET: " +
+                response.action.target
+            );
+
+            Debug.Log(
+                "[AIFeedbackClient] " +
+                "ACTION VALUE: " +
+                response.action.value
+            );
+        }
+
+        // ========================================================
+        // DISPLAY AI FEEDBACK
+        // ========================================================
+
+        if (
+            AIFeedbackPanel.Instance !=
+            null
+        )
+        {
+            int displayDuration;
+
+            if (
+                response.cooldownSeconds >
+                0
+            )
+            {
+                displayDuration =
+                    response.cooldownSeconds;
+            }
+            else
+            {
+                displayDuration =
+                    Mathf.RoundToInt(
+                        minimumCooldownSeconds
+                    );
+            }
+
+            AIFeedbackPanel.Instance
+                .ShowFeedback(
+                    response.message,
+                    displayDuration
+                );
         }
         else
         {
