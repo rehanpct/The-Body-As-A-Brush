@@ -276,18 +276,18 @@ public class VSignGesture : MonoBehaviour
         // REGISTER FOR UNDO + CENTRAL AI FEEDBACK
         // =====================================================
 
+        if (ArtworkStatistics.Instance != null)
+        {
+            ArtworkStatistics.Instance
+                .RegisterArtworkElementCreated(fishSchool);
+        }
+
         if (ArtworkActionHistory.Instance != null)
         {
             ArtworkActionHistory.Instance
                 .RegisterAction(
                     fishSchool
                 );
-        }
-
-        if (ArtworkStatistics.Instance != null)
-        {
-            ArtworkStatistics.Instance
-                .data.fishSchoolCount++;
         }
 
         Debug.Log(
@@ -394,6 +394,12 @@ public class VSignGesture : MonoBehaviour
         // =====================================================
         // REGISTER FOR UNDO + CENTRAL AI FEEDBACK
         // =====================================================
+
+        if (ArtworkStatistics.Instance != null)
+        {
+            ArtworkStatistics.Instance
+                .RegisterArtworkElementCreated(petalGroup);
+        }
 
         if (ArtworkActionHistory.Instance != null)
         {

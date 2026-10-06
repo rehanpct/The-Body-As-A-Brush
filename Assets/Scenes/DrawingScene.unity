@@ -1532,6 +1532,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1409605757}
   - component: {fileID: 1409605756}
+  - component: {fileID: 2107000310}
   m_Layer: 0
   m_Name: AIFeedbackClient
   m_TagString: Untagged
@@ -1553,6 +1554,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AIFeedbackClient
   renderUrl: https://the-body-as-a-brush.onrender.com/api/feedback
   minimumCooldownSeconds: 20
+  automaticFeedbackVoiceOutput:
+    m_PersistentCalls:
+      m_Calls: []
 --- !u!4 &1409605757
 Transform:
   m_ObjectHideFlags: 0
@@ -1927,6 +1931,7 @@ GameObject:
   - component: {fileID: 1727411899}
   - component: {fileID: 1727411900}
   - component: {fileID: 1727411901}
+  - component: {fileID: 2107000311}
   m_Layer: 0
   m_Name: ArtworkStatistics
   m_TagString: Untagged
@@ -1953,6 +1958,9 @@ MonoBehaviour:
     fishSchoolCount: 0
     bubbleBurstCount: 0
     lanternCount: 0
+    lightTrailCount: 0
+    petalsCount: 0
+    fireworksCount: 0
     indexGestureCount: 0
     openPalmGestureCount: 0
     vSignGestureCount: 0
@@ -2016,6 +2024,7 @@ MonoBehaviour:
   compositionAnalyzer: {fileID: 599732675}
   aiFeedbackClient: {fileID: 1727411901}
   observationInterval: 10
+  minimumElementChange: 1
   enableDebugLogs: 1
 --- !u!114 &1727411901
 MonoBehaviour:
@@ -2031,6 +2040,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AIFeedbackClient
   renderUrl: https://the-body-as-a-brush.onrender.com/api/feedback
   minimumCooldownSeconds: 20
+  automaticFeedbackVoiceOutput:
+    m_PersistentCalls:
+      m_Calls: []
 --- !u!1 &1806285298
 GameObject:
   m_ObjectHideFlags: 0
@@ -2663,6 +2675,40 @@ MonoBehaviour:
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
   m_Version: 2
+--- !u!114 &2107000310
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1409605755}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a40dfbfa3ff34fb3a0456f04ed002fff, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AIFeedbackVoice
+  voiceEnabled: 1
+  speechRate: 0
+  volume: 100
+  windowsVoiceName: Microsoft Zira Desktop
+  interruptCurrentSpeech: 1
+--- !u!114 &2107000311
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1727411896}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a40dfbfa3ff34fb3a0456f04ed002fff, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AIFeedbackVoice
+  voiceEnabled: 1
+  speechRate: 0
+  volume: 100
+  windowsVoiceName: 
+  interruptCurrentSpeech: 1
 --- !u!1001 &8571076842648159877
 PrefabInstance:
   m_ObjectHideFlags: 0

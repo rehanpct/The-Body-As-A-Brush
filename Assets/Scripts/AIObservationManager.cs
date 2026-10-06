@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 public class AIObservationManager : MonoBehaviour
@@ -31,12 +32,19 @@ public class AIObservationManager : MonoBehaviour
 
     private bool hasPreviousSnapshot = false;
 
+    private readonly int[] lastZoneCounts = new int[9];
+
+    private string lastElementSignature = "";
+    private string lastObservedTheme = "";
+
     // =========================================================
     // START
     // =========================================================
 
     private void Start()
     {
+        observationInterval = Mathf.Max(20f, observationInterval);
+
         if (compositionAnalyzer == null)
         {
             compositionAnalyzer =
@@ -181,6 +189,15 @@ public class AIObservationManager : MonoBehaviour
             return true;
         }
 
+        if (BuildElementSignature(snapshot) != lastElementSignature)
+            return true;
+
+        string currentTheme = ThemeManager.Instance != null
+            ? ThemeManager.Instance.CurrentTheme.ToString()
+            : "Unknown";
+        if (currentTheme != lastObservedTheme)
+            return true;
+
         if (Mathf.Abs(
                 snapshot.totalElements -
                 lastElementCount
@@ -221,7 +238,41 @@ public class AIObservationManager : MonoBehaviour
             return true;
         }
 
+        if (snapshot.zones != null)
+        {
+            for (int i = 0;
+                 i < snapshot.zones.Count && i < lastZoneCounts.Length;
+                 i++)
+            {
+                if (snapshot.zones[i].elementCount != lastZoneCounts[i])
+                    return true;
+            }
+        }
+
         return false;
+    }
+
+    private string BuildElementSignature(
+        CompositionAnalyzer.CompositionSnapshot snapshot
+    )
+    {
+        List<string> elements = new List<string>();
+
+        if (snapshot.elements != null)
+        {
+            foreach (CompositionAnalyzer.ElementInfo element in snapshot.elements)
+            {
+                elements.Add(
+                    element.type + ":" +
+                    Mathf.RoundToInt(element.normalizedPosition.x * 20f) + ":" +
+                    Mathf.RoundToInt(element.normalizedPosition.y * 20f) + ":" +
+                    Mathf.RoundToInt(element.relativeSize * 1000f)
+                );
+            }
+        }
+
+        elements.Sort();
+        return string.Join("|", elements.ToArray());
     }
 
     // =========================================================
@@ -246,6 +297,23 @@ public class AIObservationManager : MonoBehaviour
 
         lastBottomDensity =
             snapshot.bottomDensity;
+
+        lastElementSignature =
+            BuildElementSignature(snapshot);
+
+        lastObservedTheme = ThemeManager.Instance != null
+            ? ThemeManager.Instance.CurrentTheme.ToString()
+            : "Unknown";
+
+        if (snapshot.zones != null)
+        {
+            for (int i = 0;
+                 i < snapshot.zones.Count && i < lastZoneCounts.Length;
+                 i++)
+            {
+                lastZoneCounts[i] = snapshot.zones[i].elementCount;
+            }
+        }
 
         hasPreviousSnapshot = true;
     }

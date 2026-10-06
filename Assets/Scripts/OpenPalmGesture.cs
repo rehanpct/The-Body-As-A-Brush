@@ -121,7 +121,7 @@ public class OpenPalmGesture : MonoBehaviour
         if (ArtworkStatistics.Instance != null)
         {
             ArtworkStatistics.Instance
-                .data.coralCount++;
+                .RegisterArtworkElementCreated(coral);
         }
 
         if (ArtworkActionHistory.Instance != null)
@@ -175,7 +175,7 @@ public class OpenPalmGesture : MonoBehaviour
         if (ArtworkStatistics.Instance != null)
         {
             ArtworkStatistics.Instance
-                .data.lanternCount++;
+                .RegisterArtworkElementCreated(lantern);
         }
 
         if (ArtworkActionHistory.Instance != null)

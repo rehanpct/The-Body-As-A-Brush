@@ -82,6 +82,15 @@ public class ArtworkActionHistory : MonoBehaviour
             string removedArtworkName =
                 artwork.name;
 
+            if (ArtworkStatistics.Instance != null)
+            {
+                ArtworkStatistics.Instance
+                    .RegisterArtworkElementRemoved(artwork);
+            }
+
+            // Destroy is deferred until the end of the frame.
+            // Untagging first keeps the deletion snapshot current.
+            artwork.tag = "Untagged";
             Destroy(artwork);
 
             Debug.Log(

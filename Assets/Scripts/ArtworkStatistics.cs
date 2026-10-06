@@ -165,6 +165,51 @@ public class ArtworkStatistics : MonoBehaviour
         previousGesture = currentGesture;
     }
 
+    public void RegisterArtworkElementCreated(GameObject artworkRoot)
+    {
+        AdjustArtworkElementCount(artworkRoot, 1);
+    }
+
+    public void RegisterArtworkElementRemoved(GameObject artworkRoot)
+    {
+        AdjustArtworkElementCount(artworkRoot, -1);
+    }
+
+    private void AdjustArtworkElementCount(GameObject artworkRoot, int delta)
+    {
+        if (data == null || artworkRoot == null)
+            return;
+
+        string elementType = CompositionAnalyzer.GetElementType(artworkRoot);
+        switch (elementType)
+        {
+            case "water_current":
+                data.waterCount = Mathf.Max(0, data.waterCount + delta);
+                break;
+            case "coral":
+                data.coralCount = Mathf.Max(0, data.coralCount + delta);
+                break;
+            case "fish_school":
+                data.fishSchoolCount = Mathf.Max(0, data.fishSchoolCount + delta);
+                break;
+            case "bubble_burst":
+                data.bubbleBurstCount = Mathf.Max(0, data.bubbleBurstCount + delta);
+                break;
+            case "lantern":
+                data.lanternCount = Mathf.Max(0, data.lanternCount + delta);
+                break;
+            case "light_trail":
+                data.lightTrailCount = Mathf.Max(0, data.lightTrailCount + delta);
+                break;
+            case "petals":
+                data.petalsCount = Mathf.Max(0, data.petalsCount + delta);
+                break;
+            case "fireworks":
+                data.fireworksCount = Mathf.Max(0, data.fireworksCount + delta);
+                break;
+        }
+    }
+
     // ============================================
     // FINALIZE STATISTICS
     // ============================================

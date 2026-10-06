@@ -1,4 +1,4 @@
-﻿const express = require("express");
+const express = require("express");
 const dotenv = require("dotenv");
 const OpenAI = require("openai");
 const crypto = require("crypto");
@@ -72,6 +72,17 @@ WHAT YOU ANALYZE
 
 Analyze all artwork information provided by Unity.
 
+Unity's currentTheme, element types, counts, normalized positions,
+sizes, 3 x 3 grid, and advisor recommendation are authoritative.
+Do not infer or invent objects, counts, positions, crowded areas,
+or empty areas. Use the advisor action, element, zone, and reason
+as the factual basis for a suggestion. Recommend only an element
+allowed by currentTheme.
+
+Taiwan allows only: light_trail, lantern, petals, fireworks.
+Underwater allows only: water_current, coral, fish_school, bubble_burst.
+Never describe or recommend an element from the other theme.
+
 You may receive:
 - theme
 - total number of elements
@@ -91,12 +102,14 @@ You may receive:
 - artwork progress
 
 Possible elements:
-- fish
+- light_trail
+- lantern
+- petals
+- fireworks
+- water_current
 - coral
-- bubbles
-- water
-- lanterns
-- other visual elements
+- fish_school
+- bubble_burst
 
 ============================================================
 MOST IMPORTANT RULE
@@ -374,10 +387,15 @@ there could improve visual balance."
 
 The ideal feedback contains:
 
-1. What you observed.
-2. Where it is.
-3. Why it matters.
+1. What Unity measured in the artwork.
+2. The measured location or distribution.
+3. Why the CompositionAdvisor recommendation fits.
 4. One useful suggestion.
+
+Do not name an element unless it appears in the current theme's
+measured elements or is the advisor's recommended element.
+Do not describe a location unless the grid, element positions, or
+advisor zone support it.
 
 ============================================================
 DO NOT OVER-CORRECT
@@ -397,10 +415,22 @@ focal point. I would leave the upper area relatively open."
 REVIEW MODE
 ============================================================
 
-When the event is related to an artwork review,
-give a broader evaluation.
+When eventType is artwork_review and automatic is false,
+give a broader text review of the current artwork. Mention its
+actual theme elements, their measured distribution, one strong
+area, one underused or crowded area when present, and up to two
+specific recommendations. Do not speak or address an audio output.
 
-Mention up to three useful observations.
+For automatic requests, keep the feedback to one or two short sentences and
+paraphrase only the advisor's single factual recommendation. Unity's advisor is
+authoritative for the action, element, target zone, and reason.
+
+For automatic=true, copy context.advisor.action into action.type exactly,
+context.advisor.element into action.target exactly, and context.advisor.zone into
+action.value exactly. Never substitute another action, element, or zone. If the
+advisor action is LEAVE_OPEN, do not recommend adding, placing, moving, or
+spreading any element. Recommend only the advisor element. You may mention another element only as a factual observation
+when Unity measured it; never recommend a different element.
 
 For example:
 
@@ -428,9 +458,13 @@ Valid actions:
 - add_animation
 - show_summary
 
-Normally use:
+For manual requests (automatic=false), normally use:
 
 action.type = "none"
+
+For automatic requests, the action fields are the validated composition
+recommendation, not a Unity control: echo the advisor action, element, and zone
+exactly as specified above. This rule overrides the manual action list.
 
 The AI should provide advice first.
 
@@ -442,7 +476,9 @@ RESPONSE FORMAT
 
 Return ONLY valid JSON.
 
-Use this exact structure:
+Use this exact structure. For automatic=true, keep these fields but set action.type,
+action.target, and action.value to the exact advisor action, element, and zone.
+The example below shows the manual-request defaults.
 
 {
   "message": "specific artistic feedback",
@@ -456,9 +492,8 @@ Use this exact structure:
   "cooldownSeconds": 20
 }
 
-The message should normally be 1–3 sentences.
-
-For review feedback, it may be slightly longer.
+For automatic requests, the message must be one or two concise sentences.
+For manual review feedback, it may be slightly longer.
 
 Do not use markdown.
 
@@ -546,6 +581,391 @@ function generateRequestId() {
     .toString("hex")}`;
 }
 
+
+const THEME_ELEMENTS = {
+  Taiwan: [
+    "light_trail",
+    "lantern",
+    "petals",
+    "fireworks"
+  ],
+  Underwater: [
+    "water_current",
+    "coral",
+    "fish_school",
+    "bubble_burst"
+  ]
+};
+
+const ELEMENT_MENTION_PATTERNS = {
+  light_trail: /\b(?:light[\s_-]+)?trails?\b/i,
+  lantern: /\blanterns?\b/i,
+  petals: /\bpetals?(?:\s+groups?)?\b/i,
+  fireworks: /\bfireworks?\b/i,
+  water_current: /\bwater(?:[\s_-]+currents?)\b/i,
+  coral: /\bcorals?\b/i,
+  fish_school: /\bfish(?:[\s_-]+schools?)?\b/i,
+  bubble_burst: /\bbubbles?(?:[\s_-]+bursts?)?\b/i
+};
+
+function allowedElementsForTheme(theme) {
+  if (theme === "Taiwan") return THEME_ELEMENTS.Taiwan;
+  if (theme === "Underwater") return THEME_ELEMENTS.Underwater;
+  return [];
+}
+
+const AUTOMATIC_ADVISOR_ACTIONS = new Set([
+  "NONE",
+  "LEAVE_OPEN",
+  "BALANCE",
+  "SPREAD",
+  "ADD",
+  "VARY_SIZE"
+]);
+
+const PLACEMENT_ADVISOR_ACTIONS = new Set([
+  "BALANCE",
+  "SPREAD",
+  "ADD"
+]);
+
+const COMPOSITION_ZONES = new Set([
+  "TOP_LEFT", "TOP_CENTER", "TOP_RIGHT",
+  "MIDDLE_LEFT", "MIDDLE_CENTER", "MIDDLE_RIGHT",
+  "BOTTOM_LEFT", "BOTTOM_CENTER", "BOTTOM_RIGHT"
+]);
+
+function isAutomaticCompositionRequest(body) {
+  return body?.automatic === true && body?.eventType !== "artwork_review";
+}
+
+function canonicalZoneName(value) {
+  return typeof value === "string"
+    ? value.trim().toUpperCase().replace(/[\s-]+/g, "_")
+    : "";
+}
+
+function getAutomaticAdvisor(context) {
+  return context?.advisor && typeof context.advisor === "object"
+    ? context.advisor
+    : {};
+}
+
+function deterministicAdvisorAction(body) {
+  const advisor = getAutomaticAdvisor(body?.context);
+  return {
+    type: typeof advisor.action === "string" &&
+      AUTOMATIC_ADVISOR_ACTIONS.has(advisor.action)
+      ? advisor.action
+      : "NONE",
+    target: typeof advisor.element === "string" ? advisor.element : "",
+    value: typeof advisor.zone === "string" ? advisor.zone : ""
+  };
+}
+
+function getMentionedZones(text) {
+  const normalized = String(text || "")
+    .toLowerCase()
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ");
+  const zones = new Set();
+  const pattern = /\b(?:(top|upper|middle|bottom|lower)\s+(left|center|right)|(left|right)\s+center|center)\b/g;
+  let match;
+
+  while ((match = pattern.exec(normalized)) !== null) {
+    if (match[1]) {
+      const row = match[1] === "top" || match[1] === "upper"
+        ? "TOP"
+        : match[1] === "bottom" || match[1] === "lower"
+          ? "BOTTOM"
+          : "MIDDLE";
+      const column = match[2].toUpperCase();
+      zones.add(`${row}_${column}`);
+    } else if (match[3]) {
+      zones.add(`MIDDLE_${match[3].toUpperCase()}`);
+    } else {
+      zones.add("MIDDLE_CENTER");
+    }
+  }
+
+  const compass = [
+    ["TOP_LEFT", /\bnorth\s*west\b/],
+    ["TOP_RIGHT", /\bnorth\s*east\b/],
+    ["BOTTOM_LEFT", /\bsouth\s*west\b/],
+    ["BOTTOM_RIGHT", /\bsouth\s*east\b/]
+  ];
+  for (const [zone, pattern] of compass) {
+    if (pattern.test(normalized)) zones.add(zone);
+  }
+
+  return zones;
+}
+
+function countSentences(message) {
+  const trimmed = String(message || "").trim();
+  if (!trimmed) return 0;
+  const marks = trimmed.match(/[.!?]+(?=\s|$)/g);
+  return marks ? marks.length : 1;
+}
+
+function hasAlternativeElementRecommendation(message, recommendedElement, measuredElements) {
+  const placementCue = /\b(?:add(?:ing)?|place(?:d|s|ing)?|put(?:ting)?|introduc(?:e|ing)|fill(?:ing)?|mov(?:e|ing)|spread(?:ing)?)\b/i;
+  const sentences = String(message || "").split(/[.!?]+/);
+  for (const [element, pattern] of Object.entries(ELEMENT_MENTION_PATTERNS)) {
+    if (element === recommendedElement || !measuredElements.has(element)) continue;
+    for (const sentence of sentences) {
+      if (pattern.test(sentence) && placementCue.test(sentence)) return true;
+    }
+  }
+  return false;
+}
+
+function validateAutomaticAdvisor(context) {
+  const theme = context?.currentTheme;
+  const allowed = allowedElementsForTheme(theme);
+  if (!allowed.length) {
+    return { valid: false, reason: "The current theme is missing or unsupported." };
+  }
+
+  const advisor = getAutomaticAdvisor(context);
+  if (!AUTOMATIC_ADVISOR_ACTIONS.has(advisor.action)) {
+    return { valid: false, reason: "Unity advisor action is missing or unsupported." };
+  }
+
+  const element = typeof advisor.element === "string" ? advisor.element : "";
+  const zone = canonicalZoneName(advisor.zone);
+  const measured = new Set(
+    Array.isArray(context?.elements)
+      ? context.elements
+        .filter(item => item && typeof item.type === "string")
+        .map(item => item.type)
+      : []
+  );
+
+  if (advisor.action !== "NONE") {
+    if (!allowed.includes(element)) {
+      return { valid: false, reason: "Unity advisor element conflicts with the current theme." };
+    }
+    if (advisor.action !== "ADD" && !measured.has(element)) {
+      return { valid: false, reason: "Unity advisor element is not supported by measured data." };
+    }
+    if (!COMPOSITION_ZONES.has(zone)) {
+      return { valid: false, reason: "Unity advisor zone is missing or invalid." };
+    }
+  } else if (element && (!allowed.includes(element) || !measured.has(element))) {
+    return { valid: false, reason: "Unity advisor element is not supported by measured data." };
+  }
+
+  const grid = Array.isArray(context?.grid) ? context.grid : [];
+  let sourceZone = "";
+  let sourceCount = -1;
+  for (const item of grid) {
+    if (!item || typeof item.name !== "string") continue;
+    const count = Number(item.elementCount) || 0;
+    if (count > sourceCount) {
+      sourceZone = canonicalZoneName(item.name);
+      sourceCount = count;
+    }
+  }
+
+  if (PLACEMENT_ADVISOR_ACTIONS.has(advisor.action)) {
+    const target = grid.find(item => canonicalZoneName(item?.name) === zone);
+    if (!target) {
+      return { valid: false, reason: "Unity advisor placement zone is absent from the measured grid." };
+    }
+    if (target.isCrowded !== false) {
+      return { valid: false, reason: "Unity advisor placement zone is crowded or its crowd state is missing." };
+    }
+  }
+
+  return { valid: true, reason: "", advisor, allowed, measured, zone, sourceZone };
+}
+
+function buildAdvisorFallback(body) {
+  const context = body?.context || {};
+  const advisor = context.advisor || {};
+  const isReview = body?.eventType === "artwork_review";
+  const automatic = isAutomaticCompositionRequest(body);
+  const message =
+    typeof advisor.fallbackMessage === "string" &&
+    advisor.fallbackMessage.trim()
+      ? advisor.fallbackMessage.trim()
+      : "The active theme data is unavailable, so a theme-specific review is not ready.";
+
+  return {
+    message,
+    feedbackType: isReview ? "review" : "hint",
+    action: automatic
+      ? deterministicAdvisorAction(body)
+      : { type: "none", target: "", value: "" },
+    priority: "normal",
+    cooldownSeconds: 20
+  };
+}
+
+function validateAIResponse(feedback, body) {
+  const validFeedbackTypes = [
+    "hint",
+    "encouragement",
+    "strategy",
+    "review",
+    "warning",
+    "summary"
+  ];
+  const validActions = [
+    "none",
+    "highlight_tool",
+    "change_brush",
+    "suggest_color",
+    "spawn_preview",
+    "adjust_brush_size",
+    "play_gesture_demo",
+    "undo_last_action",
+    "show_composition_hint",
+    "add_animation",
+    "show_summary"
+  ];
+  const automatic = isAutomaticCompositionRequest(body);
+  const advisor = getAutomaticAdvisor(body?.context);
+  const actionTypeValid = automatic
+    ? typeof feedback?.action?.type === "string"
+    : validActions.includes(feedback?.action?.type);
+
+  if (!feedback || typeof feedback !== "object" ||
+      typeof feedback.message !== "string" ||
+      !feedback.message.trim() ||
+      !validFeedbackTypes.includes(feedback.feedbackType) ||
+      !feedback.action || typeof feedback.action !== "object" ||
+      !actionTypeValid ||
+      typeof feedback.action.target !== "string" ||
+      typeof feedback.action.value !== "string" ||
+      !Number.isFinite(Number(feedback.cooldownSeconds)) ||
+      Number(feedback.cooldownSeconds) <= 0) {
+    return { valid: false, reason: "Malformed response structure." };
+  }
+
+  if (!(["normal", "high", "low"].includes(feedback.priority))) {
+    return { valid: false, reason: "Invalid response priority." };
+  }
+
+  if (body?.eventType === "artwork_review" &&
+      feedback.feedbackType !== "review") {
+    return { valid: false, reason: "A manual review must use feedbackType review." };
+  }
+
+  const context = body?.context || {};
+  const theme = context.currentTheme;
+  const allowed = allowedElementsForTheme(theme);
+  if (!allowed.length) {
+    return { valid: false, reason: "The current theme is missing or unsupported." };
+  }
+
+  if (automatic) {
+    const advisorValidation = validateAutomaticAdvisor(context);
+    if (!advisorValidation.valid) return advisorValidation;
+    if (feedback.action.type !== advisor.action ||
+        feedback.action.target !== (advisor.element || "") ||
+        feedback.action.value !== (advisor.zone || "")) {
+      return {
+        valid: false,
+        reason: "Automatic response action, element, or zone differs from Unity's deterministic advisor."
+      };
+    }
+    if (countSentences(feedback.message) > 2) {
+      return { valid: false, reason: "Automatic response exceeds two sentences." };
+    }
+
+    const messageZones = getMentionedZones(feedback.message);
+    for (const zone of messageZones) {
+      if (zone !== advisorValidation.zone && zone !== advisorValidation.sourceZone) {
+        return { valid: false, reason: "Automatic response mentions a different composition zone." };
+      }
+    }
+
+    if (PLACEMENT_ADVISOR_ACTIONS.has(advisor.action) &&
+        !messageZones.has(advisorValidation.zone)) {
+      return { valid: false, reason: "Automatic response does not preserve Unity's target zone in its message." };
+    }
+
+    const placementLanguage = /\b(?:add(?:ing)?|place(?:d|s|ing)?|put(?:ting)?|introduc(?:e|ing)|fill(?:ing)?|mov(?:e|ing)|spread(?:ing)?)\b/i;
+    if (advisor.action === "LEAVE_OPEN" && placementLanguage.test(feedback.message)) {
+      return { valid: false, reason: "LEAVE_OPEN response contains a placement recommendation." };
+    }
+    if ((advisor.action === "NONE" || advisor.action === "VARY_SIZE") &&
+        placementLanguage.test(feedback.message)) {
+      return { valid: false, reason: "Automatic response contains a different composition action." };
+    }
+    if (hasAlternativeElementRecommendation(feedback.message, advisor.element, advisorValidation.measured)) {
+      return { valid: false, reason: "Automatic response recommends a measured element other than Unity's advisor element." };
+    }
+
+    const actionLanguage = {
+      ADD: /\b(?:add|adding|place|placing|put|try|consider|toward|near(?:by)?)\b/i,
+      SPREAD: /\b(?:spread|spreading|place|placing|move|moving|try|consider|near|toward)\b/i,
+      BALANCE: /\b(?:balance|balancing|place|placing|add|adding|try|consider|near|toward)\b/i,
+      VARY_SIZE: /\b(?:size|scale|larger|smaller|vary|varying)\b/i,
+      LEAVE_OPEN: /\b(?:leave|leaving|open|space|breathing room|stand out)\b/i
+    };
+    const requiredLanguage = actionLanguage[advisor.action];
+    if (requiredLanguage && !requiredLanguage.test(feedback.message)) {
+      return { valid: false, reason: "Automatic message does not express Unity's recommended action." };
+    }
+  }
+
+  const present = new Set();
+  if (Array.isArray(context.elements)) {
+    for (const element of context.elements) {
+      if (element && typeof element.type === "string") {
+        present.add(element.type);
+      }
+    }
+  }
+
+  if (advisor.element && advisor.action !== "NONE") {
+    if (!allowed.includes(advisor.element)) {
+      return { valid: false, reason: "Advisor element conflicts with current theme." };
+    }
+    present.add(advisor.element);
+  }
+
+  const combinedText =
+    feedback.message + " " +
+    feedback.action.target + " " +
+    feedback.action.value;
+
+  for (const [element, pattern] of Object.entries(ELEMENT_MENTION_PATTERNS)) {
+    if (!pattern.test(combinedText)) continue;
+    if (!allowed.includes(element)) {
+      return {
+        valid: false,
+        reason: "Response mentions an element forbidden by the current theme."
+      };
+    }
+    if (!present.has(element)) {
+      return {
+        valid: false,
+        reason: "Response references an element absent from Unity data and advisor."
+      };
+    }
+  }
+
+  if (!automatic && feedback.action.type === "show_composition_hint" &&
+      feedback.action.value) {
+    const requestedZone = feedback.action.value.toUpperCase().replace(/-/g, "_");
+    const advisorZone = typeof advisor.zone === "string"
+      ? advisor.zone.toUpperCase().replace(/-/g, "_")
+      : "";
+    if (requestedZone !== advisorZone) {
+      return {
+        valid: false,
+        reason: "Response action location differs from the deterministic advisor."
+      };
+    }
+  }
+
+  return { valid: true, reason: "" };
+}
+
 // ============================================================
 // NORMALIZE AI RESPONSE
 // ============================================================
@@ -628,86 +1048,7 @@ function normalizeFeedback(feedback) {
 // ============================================================
 
 function generateMockFeedback(body) {
-  const eventType =
-    body?.eventType || "";
-
-  if (eventType === "object_added") {
-    return {
-      message:
-        "Nice addition. The new element is helping build the composition.",
-
-      feedbackType:
-        "encouragement",
-
-      action: {
-        type: "none",
-        target: "",
-        value: ""
-      },
-
-      priority: "normal",
-
-      cooldownSeconds: 20
-    };
-  }
-
-  if (eventType === "composition_update") {
-    return {
-      message:
-        "Your composition is developing. Consider balancing the open space with another visual element.",
-
-      feedbackType:
-        "hint",
-
-      action: {
-        type: "show_composition_hint",
-        target: "",
-        value: ""
-      },
-
-      priority: "normal",
-
-      cooldownSeconds: 20
-    };
-  }
-
-  if (eventType === "artwork_review") {
-    return {
-      message:
-        "Your artwork has a developing focal point. Consider balancing the quieter area with one smaller supporting element.",
-
-      feedbackType:
-        "review",
-
-      action: {
-        type: "show_summary",
-        target: "",
-        value: ""
-      },
-
-      priority: "normal",
-
-      cooldownSeconds: 20
-    };
-  }
-
-  return {
-    message:
-      "Your artwork is developing nicely. Keep experimenting with your composition.",
-
-    feedbackType:
-      "encouragement",
-
-    action: {
-      type: "none",
-      target: "",
-      value: ""
-    },
-
-    priority: "normal",
-
-    cooldownSeconds: 20
-  };
+  return buildAdvisorFallback(body);
 }
 
 // ============================================================
@@ -797,6 +1138,9 @@ async function generateAIFeedback(body) {
         eventType:
           body.eventType,
 
+        automatic:
+          body.automatic === true,
+
         sessionId:
           body.sessionId,
 
@@ -848,30 +1192,26 @@ async function generateAIFeedback(body) {
     // IMPORTANT:
     // Never put the raw JSON into "message".
     // Unity would display it directly in the feedback panel.
-    parsed = {
-      message:
-        "I could not complete the artwork review right now. Please try again.",
-
-      feedbackType:
-        "encouragement",
-
-      action: {
-        type: "none",
-        target: "",
-        value: ""
-      },
-
-      priority:
-        "normal",
-
-      cooldownSeconds:
-        20
-    };
+    return buildAdvisorFallback(body);
   }
 
-  return normalizeFeedback(
-    parsed
-  );
+  const validation =
+    validateAIResponse(parsed, body);
+
+  if (!validation.valid) {
+    console.warn(
+      "[OPENAI RESPONSE REJECTED]",
+      validation.reason
+    );
+    return buildAdvisorFallback(body);
+  }
+
+  const normalized = normalizeFeedback(parsed);
+  if (isAutomaticCompositionRequest(body)) {
+    // The model's fields were checked above; keep Unity's exact action contract.
+    normalized.action = deterministicAdvisorAction(body);
+  }
+  return normalized;
 }
 
 // ============================================================

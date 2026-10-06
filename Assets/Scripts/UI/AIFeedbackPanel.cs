@@ -59,6 +59,15 @@ namespace BodyAsBrush.UI
 
         public void ShowFeedback(string message, int cooldownSeconds)
         {
+            ShowFeedback(message, cooldownSeconds, false);
+        }
+
+        public void ShowFeedback(
+            string message,
+            int cooldownSeconds,
+            bool isCreativeReview
+        )
+        {
             if (canvasGroup == null || feedbackText == null)
             {
                 Debug.LogWarning(
@@ -66,6 +75,13 @@ namespace BodyAsBrush.UI
                 );
 
                 return;
+            }
+
+            if (titleText != null)
+            {
+                titleText.text = isCreativeReview
+                    ? "AI Creative Review"
+                    : "AI Feedback";
             }
 
             if (displayCoroutine != null)

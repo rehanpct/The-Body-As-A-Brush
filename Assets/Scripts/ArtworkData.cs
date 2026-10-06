@@ -20,6 +20,9 @@ public class ArtworkData
 
     // Taiwan Theme
     public int lanternCount;
+    public int lightTrailCount;
+    public int petalsCount;
+    public int fireworksCount;
 
     // -----------------------------------------
     // GESTURES
@@ -63,6 +66,9 @@ public class ArtworkData
 
         // Taiwan Theme
         lanternCount = 0;
+        lightTrailCount = 0;
+        petalsCount = 0;
+        fireworksCount = 0;
 
         indexGestureCount = 0;
         openPalmGestureCount = 0;

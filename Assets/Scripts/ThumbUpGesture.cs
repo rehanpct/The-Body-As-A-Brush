@@ -212,7 +212,7 @@ public class ThumbUpGesture : MonoBehaviour
         if (ArtworkStatistics.Instance != null)
         {
             ArtworkStatistics.Instance
-                .data.bubbleBurstCount++;
+                .RegisterArtworkElementCreated(bubbleBurst);
         }
 
         // =====================================================
@@ -282,8 +282,14 @@ public class ThumbUpGesture : MonoBehaviour
             fireworksScale;
 
         // =====================================================
-        // UNDO
+        // STATISTICS + UNDO
         // =====================================================
+
+        if (ArtworkStatistics.Instance != null)
+        {
+            ArtworkStatistics.Instance
+                .RegisterArtworkElementCreated(fireworks);
+        }
 
         if (ArtworkActionHistory.Instance != null)
         {

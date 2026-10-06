@@ -123,7 +123,7 @@ public class BrushTrail : MonoBehaviour
         if (ArtworkStatistics.Instance != null)
         {
             ArtworkStatistics.Instance
-                .data.waterCount++;
+                .RegisterArtworkElementCreated(current);
         }
 
         if (ArtworkActionHistory.Instance != null)
@@ -187,6 +187,12 @@ public class BrushTrail : MonoBehaviour
 
         trail.transform.localScale *=
             scale;
+
+        if (ArtworkStatistics.Instance != null)
+        {
+            ArtworkStatistics.Instance
+                .RegisterArtworkElementCreated(trail);
+        }
 
         if (ArtworkActionHistory.Instance != null)
         {
