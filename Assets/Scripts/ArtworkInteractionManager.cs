@@ -19,6 +19,9 @@ public class ArtworkInteractionManager : MonoBehaviour
 
     private GameObject selectedObject;
 
+    private Vector3 pinchStartPosition;
+    private Vector3 scalingStartScale;
+
     private bool wasPinching = false;
     private bool wasTwoHandScaling = false;
 
@@ -117,6 +120,8 @@ public class ArtworkInteractionManager : MonoBehaviour
 
             if (selectedObject != null)
             {
+                pinchStartPosition = selectedObject.transform.position;
+
                 // Stop animation while grabbing.
                 SetArtworkMovement(
                     selectedObject,
@@ -160,6 +165,10 @@ public class ArtworkInteractionManager : MonoBehaviour
         {
             if (selectedObject != null)
             {
+                bool artworkMoved =
+                    (selectedObject.transform.position - pinchStartPosition).sqrMagnitude >
+                    0.0001f;
+
                 Debug.Log(
                     "🤏 Released artwork: " +
                     selectedObject.name
@@ -170,6 +179,9 @@ public class ArtworkInteractionManager : MonoBehaviour
                     selectedObject,
                     true
                 );
+
+                if (artworkMoved && AIFeedbackClient.Instance != null)
+                    AIFeedbackClient.Instance.NotifyArtworkChanged("artwork_moved");
             }
 
             wasPinching = false;
@@ -200,6 +212,7 @@ public class ArtworkInteractionManager : MonoBehaviour
             {
                 previousTwoHandDistance =
                     gestureManager.TwoHandDistance;
+                scalingStartScale = selectedObject.transform.localScale;
 
                 // Stop animation while scaling.
                 SetArtworkMovement(
@@ -270,6 +283,10 @@ public class ArtworkInteractionManager : MonoBehaviour
         {
             if (selectedObject != null)
             {
+                bool artworkScaled =
+                    (selectedObject.transform.localScale - scalingStartScale).sqrMagnitude >
+                    0.000001f;
+
                 SetArtworkMovement(
                     selectedObject,
                     true
@@ -278,6 +295,9 @@ public class ArtworkInteractionManager : MonoBehaviour
                 Debug.Log(
                     "🤏🤏 Scaling released."
                 );
+
+                if (artworkScaled && AIFeedbackClient.Instance != null)
+                    AIFeedbackClient.Instance.NotifyArtworkChanged("artwork_scaled");
             }
         }
 

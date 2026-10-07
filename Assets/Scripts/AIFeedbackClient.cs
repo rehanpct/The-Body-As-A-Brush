@@ -31,10 +31,10 @@ public class AIFeedbackClient : MonoBehaviour
     // COOLDOWN
     // ============================================================
 
-    [Header("Cooldown")]
+    [Header("Manual Review Cooldown")]
 
     [Tooltip(
-        "Minimum seconds between AI requests."
+        "Minimum seconds between manually requested AI reviews."
     )]
 
     [SerializeField]
@@ -58,19 +58,27 @@ public class AIFeedbackClient : MonoBehaviour
 
     private float currentCooldown;
 
+    [Header("Automatic Feedback Timing")]
+    [SerializeField]
+    private float minimumAutomaticInterval = 7f;
+
+    [SerializeField]
+    private float compositionSettlingDelay = 4f;
+
+    private float lastAutomaticRequestTime = -999f;
+    private float lastArtworkChangeTime;
+    private bool automaticCompositionDirty;
+    private bool loggedSettlingWait;
+    private bool loggedAutomaticIntervalWait;
+    private string lastDeliveredAdvisorSignature;
+    private string lastDeliveredCompositionStateSignature;
+
     [Header("Automatic Feedback Voice Output")]
     [Tooltip("Connect a text-to-speech listener here. Automatic responses bypass the text panel.")]
     [SerializeField]
     private UnityEvent<string> automaticFeedbackVoiceOutput =
         new UnityEvent<string>();
 
-    private const int MaximumRememberedAutomaticResponses = 32;
-
-    private readonly Queue<string> recentAutomaticResponseOrder =
-        new Queue<string>();
-
-    private readonly HashSet<string> recentAutomaticResponseKeys =
-        new HashSet<string>();
     // ============================================================
     // COMPOSITION ELEMENT
     // ============================================================
@@ -266,46 +274,32 @@ public class AIFeedbackClient : MonoBehaviour
         Debug.Log("[AIFeedbackClient] Automatic voice receiver connected.");
     }
 
-    // NORMAL EVENT FEEDBACK
+    // ============================================================
+    // AUTOMATIC FEEDBACK CHANGE NOTIFICATIONS
     // ============================================================
 
-    public void RequestFeedback(
-        string eventType
-    )
+    public void NotifyArtworkChanged(string source)
     {
-        if (isRequestInProgress)
-        {
-            Debug.Log("[AIFeedbackClient] Skipped — request already in progress.");
-            return;
-        }
+        automaticCompositionDirty = true;
+        lastArtworkChangeTime = Time.time;
+        loggedSettlingWait = false;
+        loggedAutomaticIntervalWait = false;
 
-        if (!CanSendRequest())
-            return;
-
-        if (CompositionAnalyzer.Instance == null)
-        {
-            Debug.LogWarning(
-                "[AIFeedbackClient] CompositionAnalyzer not found; " +
-                "automatic feedback needs a current artwork snapshot."
-            );
-            return;
-        }
-
-        CompositionAnalyzer.CompositionSnapshot snapshot =
-            CompositionAnalyzer.Instance.Analyze();
-
-        if (snapshot == null)
-            return;
-
-        StartCoroutine(
-            SendCompositionRequest(snapshot, eventType, true)
+        Debug.Log(
+            "[AIFeedbackClient] Artwork changed — settling timer reset. Source: " +
+            (string.IsNullOrWhiteSpace(source) ? "unknown" : source)
         );
     }
 
-    // ============================================================
-    // COMPOSITION FEEDBACK
-    // ============================================================
+    // Kept as a compatibility entry point for existing event bindings.
+    // Automatic requests are scheduled by Update after the artwork settles.
+    public void RequestFeedback(string eventType)
+    {
+        NotifyArtworkChanged(eventType);
+    }
 
+    // Kept for existing callers. The supplied snapshot is intentionally not
+    // retained; the scheduler analyzes the latest composition when ready.
     public void RequestCompositionFeedback(
         CompositionAnalyzer.CompositionSnapshot snapshot
     )
@@ -313,36 +307,160 @@ public class AIFeedbackClient : MonoBehaviour
         if (snapshot == null)
         {
             Debug.LogWarning(
-                "[AIFeedbackClient] " +
-                "Composition snapshot is null."
+                "[AIFeedbackClient] Composition change notification had no snapshot."
             );
+            return;
+        }
+
+        NotifyArtworkChanged("composition_update");
+    }
+
+    private void Update()
+    {
+        ProcessAutomaticFeedbackSchedule();
+    }
+
+    private void ProcessAutomaticFeedbackSchedule()
+    {
+        if (!automaticCompositionDirty || isRequestInProgress)
+            return;
+
+        float settleDelay = Mathf.Max(0f, compositionSettlingDelay);
+        if (Time.time - lastArtworkChangeTime < settleDelay)
+        {
+            if (!loggedSettlingWait)
+            {
+                Debug.Log("[AIFeedbackClient] Waiting for drawing to settle.");
+                loggedSettlingWait = true;
+            }
 
             return;
         }
 
-        if (isRequestInProgress)
+        float automaticInterval = Mathf.Max(0f, minimumAutomaticInterval);
+        float intervalRemaining =
+            automaticInterval - (Time.time - lastAutomaticRequestTime);
+        if (intervalRemaining > 0f)
         {
+            if (!loggedAutomaticIntervalWait)
+            {
+                Debug.Log(
+                    "[AIFeedbackClient] Automatic feedback delayed — minimum interval not elapsed. " +
+                    intervalRemaining.ToString("F1") + "s remaining."
+                );
+                loggedAutomaticIntervalWait = true;
+            }
+
+            return;
+        }
+
+        if (CompositionAnalyzer.Instance == null)
+        {
+            Debug.LogWarning(
+                "[AIFeedbackClient] CompositionAnalyzer not found; automatic feedback remains queued."
+            );
+            return;
+        }
+
+        Debug.Log("[AIFeedbackClient] Drawing settled — analyzing current composition.");
+
+        CompositionAnalyzer.CompositionSnapshot snapshot =
+            CompositionAnalyzer.Instance.Analyze();
+        if (snapshot == null)
+        {
+            Debug.LogWarning(
+                "[AIFeedbackClient] Current composition could not be analyzed; automatic feedback remains queued."
+            );
+            return;
+        }
+
+        CompositionContext context = BuildCompositionContext(snapshot);
+        string advisorSignature =
+            BuildAdvisorRecommendationSignature(context.advisor);
+        string compositionStateSignature =
+            BuildCompositionStateSignature(context);
+
+        if (advisorSignature == lastDeliveredAdvisorSignature &&
+            compositionStateSignature == lastDeliveredCompositionStateSignature)
+        {
+            automaticCompositionDirty = false;
+            loggedSettlingWait = false;
+            loggedAutomaticIntervalWait = false;
+
             Debug.Log(
-                "[AIFeedbackClient] " +
-                "Composition request skipped — " +
-                "request already in progress."
+                "[AIFeedbackClient] Automatic feedback skipped — duplicate recommendation: " +
+                advisorSignature
             );
-
             return;
         }
 
-        if (!CanSendRequest())
-        {
-            return;
-        }
+        automaticCompositionDirty = false;
+        loggedSettlingWait = false;
+        loggedAutomaticIntervalWait = false;
+        lastAutomaticRequestTime = Time.time;
 
+        Debug.Log("[AIFeedbackClient] Automatic feedback request sent.");
         StartCoroutine(
             SendCompositionRequest(
                 snapshot,
                 "composition_update",
-                true
+                true,
+                context
             )
         );
+    }
+
+    private static string BuildAdvisorRecommendationSignature(
+        CompositionAdvisorRecommendation advisor
+    )
+    {
+        if (advisor == null)
+            return "||";
+
+        return (advisor.action ?? "") + "|" +
+            (advisor.element ?? "") + "|" +
+            (advisor.zone ?? "");
+    }
+
+    private static string BuildCompositionStateSignature(
+        CompositionContext context
+    )
+    {
+        List<string> elements = new List<string>();
+        if (context.elements != null)
+        {
+            foreach (CompositionElement element in context.elements)
+            {
+                if (element == null)
+                    continue;
+
+                elements.Add(
+                    (element.type ?? "") + ":" +
+                    Mathf.RoundToInt(element.normalizedX * 20f) + ":" +
+                    Mathf.RoundToInt(element.normalizedY * 20f) + ":" +
+                    Mathf.RoundToInt(element.relativeSize * 1000f)
+                );
+            }
+        }
+        elements.Sort(StringComparer.Ordinal);
+
+        List<string> zones = new List<string>();
+        if (context.grid != null)
+        {
+            foreach (CompositionAnalyzer.ZoneInfo zone in context.grid)
+            {
+                if (zone != null)
+                    zones.Add((zone.name ?? "") + ":" + zone.elementCount);
+            }
+        }
+        zones.Sort(StringComparer.Ordinal);
+
+        StringBuilder signature = new StringBuilder();
+        signature.Append(context.currentTheme ?? "Unknown")
+            .Append("|count:").Append(context.totalElements)
+            .Append("|elements:").Append(string.Join("|", elements.ToArray()))
+            .Append("|zones:").Append(string.Join("|", zones.ToArray()));
+        return signature.ToString();
     }
 
     // ============================================================
@@ -585,7 +703,8 @@ public class AIFeedbackClient : MonoBehaviour
     private IEnumerator SendCompositionRequest(
         CompositionAnalyzer.CompositionSnapshot snapshot,
         string eventType,
-        bool automatic
+        bool automatic,
+        CompositionContext preparedContext = null
     )
     {
         isRequestInProgress = true;
@@ -599,7 +718,7 @@ public class AIFeedbackClient : MonoBehaviour
                 "yyyy-MM-ddTHH:mm:ssZ"
             ),
             automatic = automatic,
-            context = BuildCompositionContext(snapshot)
+            context = preparedContext ?? BuildCompositionContext(snapshot)
         };
 
         string json = JsonUtility.ToJson(request);
@@ -879,21 +998,17 @@ public class AIFeedbackClient : MonoBehaviour
         return false;
     }
 
-    private bool IsDuplicateAutomaticResponse(FeedbackResponse response)
+    private void RememberDeliveredAutomaticRecommendation(
+        CompositionContext deliveredContext
+    )
     {
-        string key = !string.IsNullOrWhiteSpace(response.requestId)
-            ? "request:" + response.requestId.Trim()
-            : "message:" + response.message.Trim();
+        if (deliveredContext == null)
+            return;
 
-        if (recentAutomaticResponseKeys.Contains(key))
-            return true;
-
-        recentAutomaticResponseKeys.Add(key);
-        recentAutomaticResponseOrder.Enqueue(key);
-        while (recentAutomaticResponseOrder.Count > MaximumRememberedAutomaticResponses)
-            recentAutomaticResponseKeys.Remove(recentAutomaticResponseOrder.Dequeue());
-
-        return false;
+        lastDeliveredAdvisorSignature =
+            BuildAdvisorRecommendationSignature(deliveredContext.advisor);
+        lastDeliveredCompositionStateSignature =
+            BuildCompositionStateSignature(deliveredContext);
     }
 
     // HANDLE AI RESPONSE
@@ -1074,11 +1189,7 @@ public class AIFeedbackClient : MonoBehaviour
         // Manual reviews remain text-only in the review panel.
         if (automatic)
         {
-            if (IsDuplicateAutomaticResponse(response))
-            {
-                Debug.Log("[AIFeedbackClient] Duplicate automatic response suppressed.");
-                return;
-            }
+            RememberDeliveredAutomaticRecommendation(expectedContext);
 
             if (automaticFeedbackVoiceOutput == null)
                 automaticFeedbackVoiceOutput = new UnityEvent<string>();

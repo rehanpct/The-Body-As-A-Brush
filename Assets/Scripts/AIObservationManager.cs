@@ -171,9 +171,9 @@ public class AIObservationManager : MonoBehaviour
 
         UpdatePreviousSnapshot(snapshot);
 
-        aiFeedbackClient.RequestCompositionFeedback(
-            snapshot
-        );
+        // This observer only reports a change. AIFeedbackClient owns the
+        // single settling, cooldown, duplicate-check, and request schedule.
+        aiFeedbackClient.NotifyArtworkChanged("periodic_observation");
     }
 
     // =========================================================

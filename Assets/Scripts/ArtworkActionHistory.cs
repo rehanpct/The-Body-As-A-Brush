@@ -37,21 +37,10 @@ public class ArtworkActionHistory : MonoBehaviour
             actionHistory.Count
         );
 
-        // =====================================================
-        // CENTRAL AI FEEDBACK TRIGGER
-        // =====================================================
-        //
-        // Every artwork creation that uses RegisterAction()
-        // can now trigger the AI feedback system.
-        //
-        // AIFeedbackClient handles the cooldown, so this does
-        // not send unlimited requests.
-        // =====================================================
-
         if (AIFeedbackClient.Instance != null)
         {
             AIFeedbackClient.Instance
-                .RequestFeedback("object_added");
+                .NotifyArtworkChanged("object_added");
         }
     }
 
@@ -105,7 +94,7 @@ public class ArtworkActionHistory : MonoBehaviour
             if (AIFeedbackClient.Instance != null)
             {
                 AIFeedbackClient.Instance
-                    .RequestFeedback("object_deleted");
+                    .NotifyArtworkChanged("object_deleted");
             }
         }
     }
