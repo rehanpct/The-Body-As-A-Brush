@@ -14,15 +14,10 @@ public class CompositionAnalyzer : MonoBehaviour
     public class ElementInfo
     {
         public string type;
-
         public Vector2 normalizedPosition;
-
         public Vector2 normalizedSize;
-
         public float width;
-
         public float height;
-
         public float relativeSize;
     }
 
@@ -34,17 +29,16 @@ public class CompositionAnalyzer : MonoBehaviour
     public class EmptySpaceInfo
     {
         public float left;
-
         public float right;
-
         public float top;
-
         public float bottom;
-
         public string largestEmptyRegion;
-
         public float largestEmptyPercentage;
     }
+
+    // =========================================================
+    // ZONE INFORMATION
+    // =========================================================
 
     [Serializable]
     public class ZoneInfo
@@ -67,24 +61,18 @@ public class CompositionAnalyzer : MonoBehaviour
         public int totalElements;
 
         public float leftDensity;
-
         public float rightDensity;
-
         public float topDensity;
-
         public float bottomDensity;
 
         public EmptySpaceInfo emptySpace =
             new EmptySpaceInfo();
 
         public bool hasLargeObject;
-
         public string largeObjectType;
-
         public float largestObjectPercentage;
 
         public bool hasCluster;
-
         public float averageDistance;
 
         public List<ElementInfo> elements =
@@ -136,8 +124,7 @@ public class CompositionAnalyzer : MonoBehaviour
 
     private void Awake()
     {
-        if (Instance != null &&
-            Instance != this)
+        if (Instance != null && Instance != this)
         {
             Destroy(gameObject);
             return;
@@ -165,8 +152,10 @@ public class CompositionAnalyzer : MonoBehaviour
 
         foreach (GameObject obj in objects)
         {
-            if (obj != null &&
-                obj.activeInHierarchy)
+            if (
+                obj != null &&
+                obj.activeInHierarchy
+            )
             {
                 validObjects.Add(obj);
             }
@@ -177,51 +166,28 @@ public class CompositionAnalyzer : MonoBehaviour
 
         if (validObjects.Count == 0)
         {
-            snapshot.zones = BuildZoneGrid(snapshot.elements);
+            snapshot.zones =
+                BuildZoneGrid(snapshot.elements);
+
             return snapshot;
         }
 
-        // =====================================================
-        // ARTWORK AREA
-        // =====================================================
-
         float artworkWidth =
-            Mathf.Abs(
-                maxX - minX
-            );
+            Mathf.Abs(maxX - minX);
 
         float artworkHeight =
-            Mathf.Abs(
-                maxY - minY
-            );
+            Mathf.Abs(maxY - minY);
 
         float artworkArea =
-            artworkWidth *
-            artworkHeight;
-
-        // =====================================================
-        // DENSITY COUNTERS
-        // =====================================================
+            artworkWidth * artworkHeight;
 
         int leftCount = 0;
-
         int rightCount = 0;
-
         int topCount = 0;
-
         int bottomCount = 0;
 
-        // =====================================================
-        // LARGEST OBJECT
-        // =====================================================
-
         float largestArea = 0f;
-
         string largestType = "";
-
-        // =====================================================
-        // ANALYZE EVERY OBJECT
-        // =====================================================
 
         foreach (
             GameObject obj
@@ -237,10 +203,6 @@ public class CompositionAnalyzer : MonoBehaviour
             Vector3 size =
                 bounds.size;
 
-            // -------------------------------------------------
-            // NORMALIZED POSITION
-            // -------------------------------------------------
-
             float normalizedX =
                 Mathf.InverseLerp(
                     minX,
@@ -254,10 +216,6 @@ public class CompositionAnalyzer : MonoBehaviour
                     maxY,
                     center.y
                 );
-
-            // -------------------------------------------------
-            // NORMALIZED SIZE
-            // -------------------------------------------------
 
             float normalizedWidth =
                 Mathf.Clamp01(
@@ -277,23 +235,13 @@ public class CompositionAnalyzer : MonoBehaviour
                     )
                 );
 
-            // -------------------------------------------------
-            // OBJECT AREA
-            // -------------------------------------------------
-
             float objectArea =
-                size.x *
-                size.y;
+                size.x * size.y;
 
             float relativeArea =
                 artworkArea > 0f
-                    ? objectArea /
-                      artworkArea
+                    ? objectArea / artworkArea
                     : 0f;
-
-            // -------------------------------------------------
-            // ELEMENT INFO
-            // -------------------------------------------------
 
             ElementInfo info =
                 new ElementInfo();
@@ -322,61 +270,29 @@ public class CompositionAnalyzer : MonoBehaviour
             info.relativeSize =
                 relativeArea;
 
-            snapshot.elements.Add(
-                info
-            );
-
-            // -------------------------------------------------
-            // LEFT / RIGHT
-            // -------------------------------------------------
+            snapshot.elements.Add(info);
 
             if (normalizedX < 0.5f)
-            {
                 leftCount++;
-            }
             else
-            {
                 rightCount++;
-            }
-
-            // -------------------------------------------------
-            // TOP / BOTTOM
-            // -------------------------------------------------
 
             if (normalizedY >= 0.5f)
-            {
                 topCount++;
-            }
             else
-            {
                 bottomCount++;
-            }
 
-            // -------------------------------------------------
-            // LARGEST OBJECT
-            // -------------------------------------------------
-
-            if (objectArea >
-                largestArea)
+            if (objectArea > largestArea)
             {
-                largestArea =
-                    objectArea;
-
-                largestType =
-                    info.type;
+                largestArea = objectArea;
+                largestType = info.type;
             }
         }
 
-        // =====================================================
-        // 3 x 3 SPATIAL GRID
-        // =====================================================
-
         snapshot.zones =
-            BuildZoneGrid(snapshot.elements);
-
-        // =====================================================
-        // DENSITY
-        // =====================================================
+            BuildZoneGrid(
+                snapshot.elements
+            );
 
         snapshot.leftDensity =
             (float)leftCount /
@@ -394,10 +310,6 @@ public class CompositionAnalyzer : MonoBehaviour
             (float)bottomCount /
             validObjects.Count;
 
-        // =====================================================
-        // LARGE OBJECT
-        // =====================================================
-
         snapshot.largestObjectPercentage =
             largestArea /
             Mathf.Max(
@@ -410,25 +322,14 @@ public class CompositionAnalyzer : MonoBehaviour
             largeObjectPercentage
         )
         {
-            snapshot.hasLargeObject =
-                true;
-
-            snapshot.largeObjectType =
-                largestType;
+            snapshot.hasLargeObject = true;
+            snapshot.largeObjectType = largestType;
         }
-
-        // =====================================================
-        // EMPTY SPACE
-        // =====================================================
 
         snapshot.emptySpace =
             CalculateEmptySpace(
                 validObjects
             );
-
-        // =====================================================
-        // CLUSTERING
-        // =====================================================
 
         CalculateClustering(
             validObjects,
@@ -447,9 +348,9 @@ public class CompositionAnalyzer : MonoBehaviour
     )
     {
         Renderer[] renderers =
-            obj.GetComponentsInChildren<
-                Renderer
-            >(true);
+            obj.GetComponentsInChildren<Renderer>(
+                true
+            );
 
         if (renderers.Length == 0)
         {
@@ -541,32 +442,19 @@ public class CompositionAnalyzer : MonoBehaviour
                     gridRows - 1
                 );
 
-            occupied[
-                column,
-                row
-            ]++;
+            occupied[column, row]++;
         }
 
-        // =====================================================
-        // COUNT EMPTY CELLS
-        // =====================================================
-
         int totalCells =
-            gridColumns *
-            gridRows;
+            gridColumns * gridRows;
 
         int emptyCells = 0;
-
         int leftEmpty = 0;
-
         int rightEmpty = 0;
-
         int topEmpty = 0;
-
         int bottomEmpty = 0;
 
         int largestEmptyRun = 0;
-
         string largestRegion = "";
 
         for (
@@ -581,83 +469,64 @@ public class CompositionAnalyzer : MonoBehaviour
                 y++
             )
             {
+                if (occupied[x, y] != 0)
+                    continue;
+
+                emptyCells++;
+
                 if (
-                    occupied[x, y] ==
-                    0
+                    x <
+                    gridColumns / 2
                 )
                 {
-                    emptyCells++;
+                    leftEmpty++;
+                }
+                else
+                {
+                    rightEmpty++;
+                }
 
-                    // -----------------------------------------
-                    // LEFT / RIGHT EMPTY
-                    // -----------------------------------------
+                if (
+                    y >=
+                    gridRows / 2
+                )
+                {
+                    topEmpty++;
+                }
+                else
+                {
+                    bottomEmpty++;
+                }
 
-                    if (
-                        x <
-                        gridColumns / 2
-                    )
-                    {
-                        leftEmpty++;
-                    }
-                    else
-                    {
-                        rightEmpty++;
-                    }
+                int emptyNeighbours =
+                    CountEmptyNeighbours(
+                        occupied,
+                        x,
+                        y
+                    );
 
-                    // -----------------------------------------
-                    // TOP / BOTTOM EMPTY
-                    // -----------------------------------------
+                if (
+                    emptyNeighbours >
+                    largestEmptyRun
+                )
+                {
+                    largestEmptyRun =
+                        emptyNeighbours;
 
-                    if (
-                        y >=
-                        gridRows / 2
-                    )
-                    {
-                        topEmpty++;
-                    }
-                    else
-                    {
-                        bottomEmpty++;
-                    }
-
-                    // -----------------------------------------
-                    // LARGEST EMPTY REGION
-                    // -----------------------------------------
-
-                    int emptyNeighbours =
-                        CountEmptyNeighbours(
-                            occupied,
+                    largestRegion =
+                        GetRegionName(
                             x,
                             y
                         );
-
-                    if (
-                        emptyNeighbours >
-                        largestEmptyRun
-                    )
-                    {
-                        largestEmptyRun =
-                            emptyNeighbours;
-
-                        largestRegion =
-                            GetRegionName(
-                                x,
-                                y
-                            );
-                    }
                 }
             }
         }
-
-        // =====================================================
-        // EMPTY RATIOS
-        // =====================================================
 
         result.left =
             (float)leftEmpty /
             Mathf.Max(
                 1,
-                gridColumns / 2 *
+                (gridColumns / 2) *
                 gridRows
             );
 
@@ -665,7 +534,7 @@ public class CompositionAnalyzer : MonoBehaviour
             (float)rightEmpty /
             Mathf.Max(
                 1,
-                gridColumns / 2 *
+                (gridColumns / 2) *
                 gridRows
             );
 
@@ -785,12 +654,9 @@ public class CompositionAnalyzer : MonoBehaviour
     )
     {
         if (objects.Count < 2)
-        {
             return;
-        }
 
         float totalDistance = 0f;
-
         int pairCount = 0;
 
         foreach (
@@ -803,13 +669,8 @@ public class CompositionAnalyzer : MonoBehaviour
                 in objects
             )
             {
-                if (
-                    first ==
-                    second
-                )
-                {
+                if (first == second)
                     continue;
-                }
 
                 float distance =
                     Vector3.Distance(
@@ -817,9 +678,7 @@ public class CompositionAnalyzer : MonoBehaviour
                         second.transform.position
                     );
 
-                totalDistance +=
-                    distance;
-
+                totalDistance += distance;
                 pairCount++;
 
                 if (
@@ -827,8 +686,7 @@ public class CompositionAnalyzer : MonoBehaviour
                     clusterDistance
                 )
                 {
-                    snapshot.hasCluster =
-                        true;
+                    snapshot.hasCluster = true;
                 }
             }
         }
@@ -845,31 +703,45 @@ public class CompositionAnalyzer : MonoBehaviour
     // OBJECT TYPE
     // =========================================================
 
-    public static string GetElementType(GameObject obj)
+    public static string GetElementType(
+        GameObject obj
+    )
     {
         if (obj == null)
             return "unknown";
 
-        string objectName = obj.name.ToLowerInvariant();
+        string objectName =
+            obj.name.ToLowerInvariant();
 
         if (objectName.Contains("fish"))
             return "fish_school";
+
         if (objectName.Contains("coral"))
             return "coral";
+
         if (objectName.Contains("bubble"))
             return "bubble_burst";
+
         if (objectName.Contains("water"))
             return "water_current";
+
         if (objectName.Contains("lantern"))
             return "lantern";
+
         if (objectName.Contains("petal"))
             return "petals";
+
         if (objectName.Contains("firework"))
             return "fireworks";
-        if (objectName.Contains("lighttrail") ||
+
+        if (
+            objectName.Contains("lighttrail") ||
             objectName.Contains("goldenlight") ||
-            objectName.Contains("trail"))
+            objectName.Contains("trail")
+        )
+        {
             return "light_trail";
+        }
 
         return "unknown";
     }
@@ -883,74 +755,185 @@ public class CompositionAnalyzer : MonoBehaviour
     )
     {
         const int gridSize = 3;
-        List<ZoneInfo> zones = new List<ZoneInfo>();
-        Dictionary<string, int>[] typeCounts =
-            new Dictionary<string, int>[gridSize * gridSize];
-        string[] rows = { "TOP", "CENTER", "BOTTOM" };
-        string[] columns = { "LEFT", "CENTER", "RIGHT" };
 
-        for (int row = 0; row < gridSize; row++)
+        List<ZoneInfo> zones =
+            new List<ZoneInfo>();
+
+        Dictionary<string, int>[] typeCounts =
+            new Dictionary<string, int>[
+                gridSize * gridSize
+            ];
+
+        string[] rows =
         {
-            for (int column = 0; column < gridSize; column++)
+            "TOP",
+            "CENTER",
+            "BOTTOM"
+        };
+
+        string[] columns =
+        {
+            "LEFT",
+            "CENTER",
+            "RIGHT"
+        };
+
+        for (
+            int row = 0;
+            row < gridSize;
+            row++
+        )
+        {
+            for (
+                int column = 0;
+                column < gridSize;
+                column++
+            )
             {
-                int index = row * gridSize + column;
-                zones.Add(new ZoneInfo
-                {
-                    name = rows[row] + "_" + columns[column],
-                    dominantElementType = "",
-                    isEmpty = true
-                });
-                typeCounts[index] = new Dictionary<string, int>();
+                int index =
+                    row * gridSize +
+                    column;
+
+                zones.Add(
+                    new ZoneInfo
+                    {
+                        name =
+                            rows[row] +
+                            "_" +
+                            columns[column],
+
+                        dominantElementType = "",
+
+                        isEmpty = true
+                    }
+                );
+
+                typeCounts[index] =
+                    new Dictionary<string, int>();
             }
         }
 
-        int total = elements == null ? 0 : elements.Count;
+        int total =
+            elements == null
+                ? 0
+                : elements.Count;
+
         if (elements != null)
         {
-            foreach (ElementInfo element in elements)
+            foreach (
+                ElementInfo element
+                in elements
+            )
             {
                 if (element == null)
                     continue;
 
-                int column = Mathf.Clamp(
-                    Mathf.FloorToInt(element.normalizedPosition.x * gridSize),
-                    0, gridSize - 1);
-                int bottomRow = Mathf.Clamp(
-                    Mathf.FloorToInt(element.normalizedPosition.y * gridSize),
-                    0, gridSize - 1);
-                int displayRow = gridSize - 1 - bottomRow;
-                int index = displayRow * gridSize + column;
+                int column =
+                    Mathf.Clamp(
+                        Mathf.FloorToInt(
+                            element.normalizedPosition.x *
+                            gridSize
+                        ),
+                        0,
+                        gridSize - 1
+                    );
+
+                int bottomRow =
+                    Mathf.Clamp(
+                        Mathf.FloorToInt(
+                            element.normalizedPosition.y *
+                            gridSize
+                        ),
+                        0,
+                        gridSize - 1
+                    );
+
+                int displayRow =
+                    gridSize -
+                    1 -
+                    bottomRow;
+
+                int index =
+                    displayRow *
+                    gridSize +
+                    column;
+
                 zones[index].elementCount++;
 
-                string type = string.IsNullOrEmpty(element.type)
-                    ? "unknown"
-                    : element.type;
-                if (!typeCounts[index].ContainsKey(type))
+                string type =
+                    string.IsNullOrEmpty(
+                        element.type
+                    )
+                        ? "unknown"
+                        : element.type;
+
+                if (
+                    !typeCounts[index]
+                        .ContainsKey(type)
+                )
+                {
                     typeCounts[index][type] = 0;
+                }
+
                 typeCounts[index][type]++;
             }
         }
 
-        int crowdedThreshold = Mathf.Max(2, Mathf.CeilToInt(total / 3f));
-        for (int index = 0; index < zones.Count; index++)
+        int crowdedThreshold =
+            Mathf.Max(
+                2,
+                Mathf.CeilToInt(
+                    total / 3f
+                )
+            );
+
+        for (
+            int index = 0;
+            index < zones.Count;
+            index++
+        )
         {
-            ZoneInfo zone = zones[index];
-            zone.density = total > 0
-                ? (float)zone.elementCount / total
-                : 0f;
-            zone.isEmpty = zone.elementCount == 0;
-            zone.isCrowded = zone.elementCount >= crowdedThreshold;
+            ZoneInfo zone =
+                zones[index];
+
+            zone.density =
+                total > 0
+                    ? (float)zone.elementCount /
+                      total
+                    : 0f;
+
+            zone.isEmpty =
+                zone.elementCount == 0;
+
+            zone.isCrowded =
+                zone.elementCount >=
+                crowdedThreshold;
 
             int largest = 0;
-            List<string> types = new List<string>(typeCounts[index].Keys);
-            types.Sort(StringComparer.Ordinal);
-            foreach (string type in types)
+
+            List<string> types =
+                new List<string>(
+                    typeCounts[index].Keys
+                );
+
+            types.Sort(
+                StringComparer.Ordinal
+            );
+
+            foreach (
+                string type
+                in types
+            )
             {
-                int count = typeCounts[index][type];
+                int count =
+                    typeCounts[index][type];
+
                 if (count > largest)
                 {
                     largest = count;
-                    zone.dominantElementType = type;
+
+                    zone.dominantElementType =
+                        type;
                 }
             }
         }
@@ -1070,8 +1053,33 @@ public class CompositionAnalyzer : MonoBehaviour
                 element.relativeSize
             );
         }
+
+        Debug.Log(
+            "===== ZONES ====="
+        );
+
+        foreach (
+            ZoneInfo zone
+            in snapshot.zones
+        )
+        {
+            Debug.Log(
+                zone.name +
+                " | Count: " +
+                zone.elementCount +
+                " | Dominant: " +
+                zone.dominantElementType +
+                " | Crowded: " +
+                zone.isCrowded
+            );
+        }
     }
 }
+
+// =============================================================
+// COMPOSITION ADVISOR RECOMMENDATION
+// =============================================================
+
 [Serializable]
 public class CompositionAdvisorRecommendation
 {
@@ -1082,20 +1090,57 @@ public class CompositionAdvisorRecommendation
     public string fallbackMessage = "";
 }
 
+// =============================================================
+// COMPOSITION ADVISOR
+// =============================================================
+
 public static class CompositionAdvisor
 {
-    public static bool IsElementAllowed(string theme, string type)
-    {
-        if (string.Equals(theme, "Taiwan", StringComparison.OrdinalIgnoreCase))
-            return type == "light_trail" || type == "lantern" ||
-                   type == "petals" || type == "fireworks";
+    // =========================================================
+    // THEME ALLOWLIST
+    // =========================================================
 
-        if (string.Equals(theme, "Underwater", StringComparison.OrdinalIgnoreCase))
-            return type == "water_current" || type == "coral" ||
-                   type == "fish_school" || type == "bubble_burst";
+    public static bool IsElementAllowed(
+        string theme,
+        string type
+    )
+    {
+        if (
+            string.Equals(
+                theme,
+                "Taiwan",
+                StringComparison.OrdinalIgnoreCase
+            )
+        )
+        {
+            return
+                type == "light_trail" ||
+                type == "lantern" ||
+                type == "petals" ||
+                type == "fireworks";
+        }
+
+        if (
+            string.Equals(
+                theme,
+                "Underwater",
+                StringComparison.OrdinalIgnoreCase
+            )
+        )
+        {
+            return
+                type == "water_current" ||
+                type == "coral" ||
+                type == "fish_school" ||
+                type == "bubble_burst";
+        }
 
         return false;
     }
+
+    // =========================================================
+    // MAIN ADVISOR
+    // =========================================================
 
     public static CompositionAdvisorRecommendation Analyze(
         List<CompositionAnalyzer.ElementInfo> elements,
@@ -1104,333 +1149,1205 @@ public static class CompositionAdvisor
     {
         CompositionAdvisorRecommendation result =
             new CompositionAdvisorRecommendation();
+
         List<CompositionAnalyzer.ElementInfo> valid =
             new List<CompositionAnalyzer.ElementInfo>();
 
         if (elements != null)
         {
-            foreach (CompositionAnalyzer.ElementInfo item in elements)
-                if (item != null && IsElementAllowed(theme, item.type))
+            foreach (
+                CompositionAnalyzer.ElementInfo item
+                in elements
+            )
+            {
+                if (
+                    item != null &&
+                    IsElementAllowed(
+                        theme,
+                        item.type
+                    )
+                )
+                {
                     valid.Add(item);
+                }
+            }
         }
+
+        // ---------------------------------------------------------
+        // NO ARTWORK
+        // ---------------------------------------------------------
 
         if (valid.Count == 0)
         {
-            result.reason = "Unity found no active elements allowed by the current theme.";
+            result.action = "NONE";
+            result.element = "";
+            result.zone = "";
+
+            result.reason =
+                "Unity found no active elements allowed by the current theme.";
+
             result.fallbackMessage =
-                "There are no active " + theme + " elements to review yet.";
+                "There are no active " +
+                theme +
+                " elements to review yet.";
+
             return result;
         }
+
+        // ---------------------------------------------------------
+        // BUILD ZONES
+        // ---------------------------------------------------------
 
         List<CompositionAnalyzer.ZoneInfo> zones =
-            CompositionAnalyzer.BuildZoneGrid(valid);
-        int sourceIndex = 0;
-        for (int i = 1; i < zones.Count; i++)
-            if (zones[i].elementCount > zones[sourceIndex].elementCount)
-                sourceIndex = i;
+            CompositionAnalyzer.BuildZoneGrid(
+                valid
+            );
 
-        CompositionAnalyzer.ZoneInfo source = zones[sourceIndex];
-        string element = source.dominantElementType;
-        if (string.IsNullOrEmpty(element))
-            element = MostCommonType(valid);
+        // ---------------------------------------------------------
+        // FIND MOST OCCUPIED ZONE
+        // ---------------------------------------------------------
 
-        result.element = element;
-        result.zone = source.name;
+        int sourceIndex =
+            FindMostOccupiedZone(
+                zones
+            );
 
-        if (theme == "Underwater" &&
-            ContainsType(valid, "coral") &&
-            !ContainsType(valid, "bubble_burst") &&
-            HasIsolatedCoral(valid))
+        CompositionAnalyzer.ZoneInfo source =
+            zones[sourceIndex];
+
+        string sourceElement =
+            source.dominantElementType;
+
+        if (
+            string.IsNullOrEmpty(
+                sourceElement
+            )
+        )
         {
-            CompositionAnalyzer.ElementInfo coral = FirstOfType(valid, "coral");
-            string coralZone = ZoneFor(coral.normalizedPosition);
-            int coralZoneIndex = -1;
-            for (int i = 0; i < zones.Count; i++)
-            {
-                if (zones[i].name == coralZone)
-                {
-                    coralZoneIndex = i;
-                    break;
-                }
-            }
-
-            if (coralZoneIndex >= 0 && zones[coralZoneIndex].isCrowded)
-            {
-                int openZoneIndex = TargetZone(zones, -1, -1, coralZoneIndex);
-                if (openZoneIndex < 0)
-                {
-                    result.action = "NONE";
-                    result.zone = "";
-                    result.reason = "No non-crowded zone is available for a placement recommendation.";
-                    result.fallbackMessage = "Your composition is full of energy. Keep some space open while you continue.";
-                    return result;
-                }
-
-                coralZone = zones[openZoneIndex].name;
-            }
-
-            result.action = "ADD";
-            result.element = "bubble_burst";
-            result.zone = coralZone;
-            result.reason =
-                "A coral element is isolated in the " + Place(coralZone) +
-                " with no nearby artwork element.";
-            result.fallbackMessage =
-                "Your coral is isolated in the " + Place(coralZone) +
-                ". A small bubble burst nearby could connect it to the surrounding water.";
-            return result;
+            sourceElement =
+                MostCommonType(valid);
         }
 
-        int left = 0, right = 0, top = 0, bottom = 0;
-        foreach (CompositionAnalyzer.ElementInfo item in valid)
-        {
-            if (item.normalizedPosition.x < (1f / 3f)) left++;
-            else if (item.normalizedPosition.x >= (2f / 3f)) right++;
+        // ---------------------------------------------------------
+        // FIND ELEMENT COUNTS
+        // ---------------------------------------------------------
 
-            if (item.normalizedPosition.y >= (2f / 3f)) top++;
-            else if (item.normalizedPosition.y < (1f / 3f)) bottom++;
-        }
+        Dictionary<string, int> typeCounts =
+            CountTypes(valid);
 
-        bool horizontal = Mathf.Abs(left - right) / (float)valid.Count >= 0.30f;
-        bool vertical = Mathf.Abs(top - bottom) / (float)valid.Count >= 0.30f;
-        int preferredColumn = horizontal ? (left < right ? 0 : 2) : -1;
-        int preferredRow = vertical ? (top > bottom ? 2 : 0) : -1;
-        int targetIndex = TargetZone(
-            zones, preferredColumn, preferredRow, sourceIndex);
-        if (targetIndex < 0)
-        {
-            result.action = "NONE";
-            result.zone = "";
-            result.reason = "No non-crowded zone is available for a placement recommendation.";
-            result.fallbackMessage = "Your composition is full of energy. Keep some space open while you continue.";
-            return result;
-        }
+        // ---------------------------------------------------------
+        // FIND EMPTY / NON-CROWDED TARGET
+        // ---------------------------------------------------------
 
-        CompositionAnalyzer.ZoneInfo target = zones[targetIndex];
+        int emptyZoneIndex =
+            FindBestOpenZone(
+                zones,
+                sourceIndex
+            );
+
+        // ---------------------------------------------------------
+        // 1. CROWDED COMPOSITION
+        // ---------------------------------------------------------
+
+        // This takes priority over all theme-specific behavior.
 
         if (source.isCrowded)
         {
-            result.action = "SPREAD";
-            result.zone = target.name;
-            result.reason =
-                "The " + Place(source.name) + " zone contains " +
-                source.elementCount + " elements and meets Unity's crowded-zone threshold; " +
-                "the " + Place(target.name) + " contains " +
-                target.elementCount + ".";
-            result.fallbackMessage =
-                "Your " + Plural(element) + " are clustered in the " +
-                Place(source.name) + ". Try placing the next " +
-                Singular(element) + " near the " + Place(target.name) +
-                " to spread the visual weight.";
-            return result;
-        }
+            if (emptyZoneIndex >= 0)
+            {
+                CompositionAnalyzer.ZoneInfo target =
+                    zones[emptyZoneIndex];
 
-        if (theme == "Taiwan" && ContainsType(valid, "fireworks"))
-        {
+                result.action = "SPREAD";
+
+                result.element =
+                    sourceElement;
+
+                result.zone =
+                    target.name;
+
+                result.reason =
+                    "The " +
+                    Place(source.name) +
+                    " zone contains " +
+                    source.elementCount +
+                    " elements and is the strongest crowded area, " +
+                    "while " +
+                    Place(target.name) +
+                    " has more available space.";
+
+                result.fallbackMessage =
+                    "Your " +
+                    Plural(sourceElement) +
+                    " are concentrated in the " +
+                    Place(source.name) +
+                    ". Try placing the next " +
+                    Singular(sourceElement) +
+                    " near the " +
+                    Place(target.name) +
+                    " to spread the visual weight.";
+
+                return result;
+            }
+
             result.action = "LEAVE_OPEN";
-            result.element = "fireworks";
+
+            result.element =
+                sourceElement;
+
+            result.zone =
+                source.name;
+
             result.reason =
-                "Fireworks are present in the " + Place(source.name) +
-                " and provide a focal point.";
+                "The strongest area is already crowded and there is no useful non-crowded target.";
+
             result.fallbackMessage =
-                "Your fireworks already create a focal point in the " +
-                Place(source.name) +
-                ". Leaving nearby space open will help them stand out.";
+                "Your " +
+                Plural(sourceElement) +
+                " already create a strong area of focus. Leaving nearby space open will help the composition breathe.";
+
             return result;
         }
 
-        if (horizontal || vertical)
+        // ---------------------------------------------------------
+        // 2. STRONG HORIZONTAL / VERTICAL IMBALANCE
+        // ---------------------------------------------------------
+
+        int left = 0;
+        int right = 0;
+        int top = 0;
+        int bottom = 0;
+
+        foreach (
+            CompositionAnalyzer.ElementInfo item
+            in valid
+        )
         {
+            if (
+                item.normalizedPosition.x <
+                1f / 3f
+            )
+            {
+                left++;
+            }
+            else if (
+                item.normalizedPosition.x >=
+                2f / 3f
+            )
+            {
+                right++;
+            }
+
+            if (
+                item.normalizedPosition.y >=
+                2f / 3f
+            )
+            {
+                top++;
+            }
+            else if (
+                item.normalizedPosition.y <
+                1f / 3f
+            )
+            {
+                bottom++;
+            }
+        }
+
+        bool horizontal =
+            Mathf.Abs(left - right) /
+            (float)valid.Count >=
+            0.30f;
+
+        bool vertical =
+            Mathf.Abs(top - bottom) /
+            (float)valid.Count >=
+            0.30f;
+
+        int preferredColumn =
+            horizontal
+                ? left < right
+                    ? 0
+                    : 2
+                : -1;
+
+        int preferredRow =
+            vertical
+                ? top > bottom
+                    ? 2
+                    : 0
+                : -1;
+
+        int balanceTarget =
+            FindTargetZone(
+                zones,
+                preferredColumn,
+                preferredRow,
+                sourceIndex
+            );
+
+        if (
+            (horizontal || vertical) &&
+            balanceTarget >= 0
+        )
+        {
+            CompositionAnalyzer.ZoneInfo target =
+                zones[balanceTarget];
+
             result.action = "BALANCE";
-            result.zone = target.name;
-            result.reason = horizontal
-                ? "Unity counted " + left + " elements on the left and " +
-                  right + " on the right; the " + Place(target.name) +
-                  " is the less populated target area."
-                : "Unity counted " + top + " elements in the upper half and " +
-                  bottom + " in the lower half; the " + Place(target.name) +
-                  " is the less populated target area.";
-            result.fallbackMessage =
-                "Your " + Plural(element) + " carry more visual weight on the " +
-                (horizontal ? (left > right ? "left" : "right")
-                            : (top > bottom ? "top" : "bottom")) +
-                ". Placing the next " + Singular(element) + " near the " +
-                Place(target.name) + " would balance the scene.";
+
+            result.element =
+                sourceElement;
+
+            result.zone =
+                target.name;
+
+            if (horizontal)
+            {
+                result.reason =
+                    "Unity counted " +
+                    left +
+                    " elements on the left and " +
+                    right +
+                    " on the right; " +
+                    Place(target.name) +
+                    " is the less populated target area.";
+
+                result.fallbackMessage =
+                    "Your " +
+                    Plural(sourceElement) +
+                    " carry more visual weight on the " +
+                    (left > right
+                        ? "left"
+                        : "right") +
+                    ". Placing the next " +
+                    Singular(sourceElement) +
+                    " near the " +
+                    Place(target.name) +
+                    " could balance the scene.";
+            }
+            else
+            {
+                result.reason =
+                    "Unity counted " +
+                    top +
+                    " elements in the upper half and " +
+                    bottom +
+                    " in the lower half; " +
+                    Place(target.name) +
+                    " is the less populated target area.";
+
+                result.fallbackMessage =
+                    "Your " +
+                    Plural(sourceElement) +
+                    " carry more visual weight toward the " +
+                    (top > bottom
+                        ? "top"
+                        : "bottom") +
+                    ". Placing the next " +
+                    Singular(sourceElement) +
+                    " near the " +
+                    Place(target.name) +
+                    " could balance the scene.";
+            }
+
             return result;
         }
 
-        if (valid.Count == 1)
+        // ---------------------------------------------------------
+        // 3. LARGE OBJECT / FOCAL POINT
+        // ---------------------------------------------------------
+
+        CompositionAnalyzer.ElementInfo largeElement =
+            FindLargestElement(valid);
+
+        if (
+            largeElement != null &&
+            largeElement.relativeSize >=
+            0.12f
+        )
         {
-            result.action = "ADD";
-            result.zone = target.name;
+            string largeZone =
+                ZoneFor(
+                    largeElement.normalizedPosition
+                );
+
+            result.action =
+                "LEAVE_OPEN";
+
+            result.element =
+                largeElement.type;
+
+            result.zone =
+                largeZone;
+
             result.reason =
-                "The artwork has one active element in the " + Place(source.name) +
-                ", while the " + Place(target.name) + " is empty.";
+                "A relatively large " +
+                Singular(largeElement.type) +
+                " is creating a clear focal point in the " +
+                Place(largeZone) +
+                ".";
+
             result.fallbackMessage =
-                "Your " + Singular(element) + " sits in the " +
-                Place(source.name) + ". Adding another near the " +
-                Place(target.name) + " would give the composition more reach.";
+                "Your " +
+                Singular(largeElement.type) +
+                " creates a strong focal point in the " +
+                Place(largeZone) +
+                ". Leaving nearby space open will help it stand out.";
+
             return result;
         }
 
-        float smallest = float.MaxValue, largest = 0f;
-        foreach (CompositionAnalyzer.ElementInfo item in valid)
-        {
-            if (item.relativeSize <= 0f) continue;
-            smallest = Mathf.Min(smallest, item.relativeSize);
-            largest = Mathf.Max(largest, item.relativeSize);
-        }
+        // ---------------------------------------------------------
+        // 4. ISOLATED ELEMENT
+        // ---------------------------------------------------------
 
-        if (smallest < float.MaxValue && largest > 0f &&
-            (largest - smallest) / largest < 0.20f)
+        CompositionAnalyzer.ElementInfo isolated =
+            FindIsolatedElement(
+                valid
+            );
+
+        if (
+            isolated != null &&
+            emptyZoneIndex >= 0
+        )
         {
-            result.action = "VARY_SIZE";
+            CompositionAnalyzer.ZoneInfo target =
+                zones[emptyZoneIndex];
+
+            // Do NOT force bubble burst for coral.
+            // Do NOT force fireworks for Taiwan.
+            //
+            // Instead, keep the actual isolated element as
+            // the subject of the feedback.
+
+            result.action =
+                "BALANCE";
+
+            result.element =
+                isolated.type;
+
+            result.zone =
+                target.name;
+
             result.reason =
-                "The measured elements span multiple grid zones and their relative sizes vary by less than 20 percent.";
+                "A " +
+                Singular(isolated.type) +
+                " is isolated from the surrounding artwork, while " +
+                Place(target.name) +
+                " has available space.";
+
             result.fallbackMessage =
-                "Your elements are spread across the scene. Varying the size of your next " +
-                Singular(element) +
-                " could add rhythm without crowding another area.";
+                "Your " +
+                Singular(isolated.type) +
+                " has a lot of space around it. You can use the nearby open area to build a stronger visual connection.";
+
             return result;
         }
 
-        result.action = "NONE";
+        // ---------------------------------------------------------
+        // 5. SIZE VARIATION
+        // ---------------------------------------------------------
+
+        float smallest =
+            float.MaxValue;
+
+        float largest =
+            0f;
+
+        foreach (
+            CompositionAnalyzer.ElementInfo item
+            in valid
+        )
+        {
+            if (item.relativeSize <= 0f)
+                continue;
+
+            smallest =
+                Mathf.Min(
+                    smallest,
+                    item.relativeSize
+                );
+
+            largest =
+                Mathf.Max(
+                    largest,
+                    item.relativeSize
+                );
+        }
+
+        if (
+            smallest < float.MaxValue &&
+            largest > 0f &&
+            (largest - smallest) /
+            largest < 0.20f &&
+            valid.Count >= 3
+        )
+        {
+            string sizeElement =
+                SelectRepresentativeElement(
+                    valid
+                );
+
+            result.action =
+                "VARY_SIZE";
+
+            result.element =
+                sizeElement;
+
+            result.zone = "";
+
+            result.reason =
+                "The measured elements are similar in size, so more size variation could create visual rhythm.";
+
+            result.fallbackMessage =
+                "Your elements are similar in scale. Varying the size of your next " +
+                Singular(sizeElement) +
+                " could add more visual rhythm.";
+
+            return result;
+        }
+
+        // ---------------------------------------------------------
+        // 6. MODERATE EMPTY SPACE
+        // ---------------------------------------------------------
+
+        int meaningfulEmptyZone =
+            FindBestOpenZone(
+                zones,
+                sourceIndex
+            );
+
+        if (
+            meaningfulEmptyZone >= 0 &&
+            valid.Count <= 3
+        )
+        {
+            CompositionAnalyzer.ZoneInfo target =
+                zones[meaningfulEmptyZone];
+
+            // Choose an element intelligently rather than
+            // defaulting to fireworks or bubbles.
+
+            string addition =
+                SelectAdditionElement(
+                    theme,
+                    typeCounts,
+                    valid,
+                    target.name
+                );
+
+            result.action =
+                "ADD";
+
+            result.element =
+                addition;
+
+            result.zone =
+                target.name;
+
+            result.reason =
+                "The artwork is still developing and " +
+                Place(target.name) +
+                " has available space for another element.";
+
+            result.fallbackMessage =
+                "There is open space in the " +
+                Place(target.name) +
+                ". Adding a " +
+                Singular(addition) +
+                " there could extend the composition.";
+
+            return result;
+        }
+
+        // ---------------------------------------------------------
+        // 7. GOOD COMPOSITION
+        // ---------------------------------------------------------
+
+        result.action =
+            "NONE";
+
+        result.element =
+            sourceElement;
+
+        result.zone = "";
+
         result.reason =
-            "No 3 x 3 zone meets the crowded threshold and neither axis is strongly imbalanced.";
+            "No strong crowding or directional imbalance was detected.";
+
         result.fallbackMessage =
-            "Your elements are distributed across the scene without a clearly crowded area. Keeping some open space will preserve breathing room.";
+            "Your elements are distributed across the scene without a clearly dominant problem. Keep building the composition at your own pace.";
+
         return result;
     }
 
-    private static int TargetZone(
+    // =========================================================
+    // FIND MOST OCCUPIED ZONE
+    // =========================================================
+
+    private static int FindMostOccupiedZone(
+        List<CompositionAnalyzer.ZoneInfo> zones
+    )
+    {
+        int best =
+            0;
+
+        for (
+            int i = 1;
+            i < zones.Count;
+            i++
+        )
+        {
+            if (
+                zones[i].elementCount >
+                zones[best].elementCount
+            )
+            {
+                best = i;
+            }
+        }
+
+        return best;
+    }
+
+    // =========================================================
+    // FIND OPEN ZONE
+    // =========================================================
+
+    private static int FindBestOpenZone(
+        List<CompositionAnalyzer.ZoneInfo> zones,
+        int sourceIndex
+    )
+    {
+        int best =
+            -1;
+
+        int bestScore =
+            int.MaxValue;
+
+        for (
+            int i = 0;
+            i < zones.Count;
+            i++
+        )
+        {
+            CompositionAnalyzer.ZoneInfo zone =
+                zones[i];
+
+            if (zone.isCrowded)
+                continue;
+
+            int score =
+                zone.elementCount * 100;
+
+            if (i == sourceIndex)
+                score += 20;
+
+            if (zone.isEmpty)
+                score -= 20;
+
+            if (score < bestScore)
+            {
+                bestScore = score;
+                best = i;
+            }
+        }
+
+        return best;
+    }
+
+    // =========================================================
+    // FIND BALANCE TARGET
+    // =========================================================
+
+    private static int FindTargetZone(
         List<CompositionAnalyzer.ZoneInfo> zones,
         int preferredColumn,
         int preferredRow,
         int sourceIndex
     )
     {
-        int best = -1, bestScore = int.MaxValue;
-        for (int i = 0; i < zones.Count; i++)
+        int best =
+            -1;
+
+        int bestScore =
+            int.MaxValue;
+
+        for (
+            int i = 0;
+            i < zones.Count;
+            i++
+        )
         {
             if (zones[i].isCrowded)
                 continue;
 
-            int row = i / 3, column = i % 3;
-            int score = zones[i].elementCount * 100;
-            if (preferredColumn >= 0 && column != preferredColumn) score += 30;
-            if (preferredRow >= 0 && row != preferredRow) score += 15;
-            if (i == sourceIndex) score += 10;
-            if (score < bestScore) { best = i; bestScore = score; }
+            int row =
+                i / 3;
+
+            int column =
+                i % 3;
+
+            int score =
+                zones[i].elementCount *
+                100;
+
+            if (
+                preferredColumn >= 0 &&
+                column != preferredColumn
+            )
+            {
+                score += 30;
+            }
+
+            if (
+                preferredRow >= 0 &&
+                row != preferredRow
+            )
+            {
+                score += 15;
+            }
+
+            if (i == sourceIndex)
+                score += 20;
+
+            if (zones[i].isEmpty)
+                score -= 15;
+
+            if (score < bestScore)
+            {
+                bestScore = score;
+                best = i;
+            }
         }
+
         return best;
     }
 
-    private static bool HasIsolatedCoral(
+    // =========================================================
+    // FIND LARGEST ELEMENT
+    // =========================================================
+
+    private static CompositionAnalyzer.ElementInfo
+        FindLargestElement(
+            List<CompositionAnalyzer.ElementInfo> elements
+        )
+    {
+        CompositionAnalyzer.ElementInfo best =
+            null;
+
+        float largest =
+            0f;
+
+        foreach (
+            CompositionAnalyzer.ElementInfo element
+            in elements
+        )
+        {
+            if (
+                element == null ||
+                element.relativeSize <= 0f
+            )
+            {
+                continue;
+            }
+
+            if (
+                element.relativeSize >
+                largest
+            )
+            {
+                largest =
+                    element.relativeSize;
+
+                best =
+                    element;
+            }
+        }
+
+        return best;
+    }
+
+    // =========================================================
+    // FIND ISOLATED ELEMENT
+    // =========================================================
+
+    private static CompositionAnalyzer.ElementInfo
+        FindIsolatedElement(
+            List<CompositionAnalyzer.ElementInfo> elements
+        )
+    {
+        CompositionAnalyzer.ElementInfo best =
+            null;
+
+        float bestDistance =
+            0f;
+
+        foreach (
+            CompositionAnalyzer.ElementInfo element
+            in elements
+        )
+        {
+            if (element == null)
+                continue;
+
+            float nearest =
+                float.MaxValue;
+
+            foreach (
+                CompositionAnalyzer.ElementInfo other
+                in elements
+            )
+            {
+                if (
+                    other == null ||
+                    other == element
+                )
+                {
+                    continue;
+                }
+
+                float distance =
+                    Vector2.Distance(
+                        element.normalizedPosition,
+                        other.normalizedPosition
+                    );
+
+                nearest =
+                    Mathf.Min(
+                        nearest,
+                        distance
+                    );
+            }
+
+            if (
+                nearest != float.MaxValue &&
+                nearest > 0.20f &&
+                nearest > bestDistance
+            )
+            {
+                bestDistance =
+                    nearest;
+
+                best =
+                    element;
+            }
+        }
+
+        return best;
+    }
+
+    // =========================================================
+    // COUNT TYPES
+    // =========================================================
+
+    private static Dictionary<string, int>
+        CountTypes(
+            List<CompositionAnalyzer.ElementInfo> elements
+        )
+    {
+        Dictionary<string, int> counts =
+            new Dictionary<string, int>();
+
+        foreach (
+            CompositionAnalyzer.ElementInfo element
+            in elements
+        )
+        {
+            if (element == null)
+                continue;
+
+            if (
+                !counts.ContainsKey(
+                    element.type
+                )
+            )
+            {
+                counts[element.type] = 0;
+            }
+
+            counts[element.type]++;
+        }
+
+        return counts;
+    }
+
+    // =========================================================
+    // SELECT ADDITION ELEMENT
+    // =========================================================
+
+    private static string SelectAdditionElement(
+        string theme,
+        Dictionary<string, int> counts,
+        List<CompositionAnalyzer.ElementInfo> elements,
+        string targetZone
+    )
+    {
+        List<string> candidates =
+            new List<string>();
+
+        if (
+            string.Equals(
+                theme,
+                "Taiwan",
+                StringComparison.OrdinalIgnoreCase
+            )
+        )
+        {
+            candidates.Add("light_trail");
+            candidates.Add("lantern");
+            candidates.Add("petals");
+            candidates.Add("fireworks");
+        }
+        else if (
+            string.Equals(
+                theme,
+                "Underwater",
+                StringComparison.OrdinalIgnoreCase
+            )
+        )
+        {
+            candidates.Add("water_current");
+            candidates.Add("coral");
+            candidates.Add("fish_school");
+            candidates.Add("bubble_burst");
+        }
+
+        if (candidates.Count == 0)
+            return "";
+
+        // Find the least-used valid element.
+        //
+        // This prevents the system from always selecting fireworks
+        // or bubbles simply because the theme supports them.
+
+        string best =
+            candidates[0];
+
+        int bestCount =
+            GetCount(
+                counts,
+                best
+            );
+
+        for (
+            int i = 1;
+            i < candidates.Count;
+            i++
+        )
+        {
+            string candidate =
+                candidates[i];
+
+            int count =
+                GetCount(
+                    counts,
+                    candidate
+                );
+
+            if (
+                count <
+                bestCount
+            )
+            {
+                best =
+                    candidate;
+
+                bestCount =
+                    count;
+            }
+        }
+
+        // If all four are equally unused, use the first candidate.
+        // This is only used for an ADD recommendation.
+        return best;
+    }
+
+    // =========================================================
+    // GET COUNT
+    // =========================================================
+
+    private static int GetCount(
+        Dictionary<string, int> counts,
+        string type
+    )
+    {
+        if (
+            counts != null &&
+            counts.ContainsKey(type)
+        )
+        {
+            return counts[type];
+        }
+
+        return 0;
+    }
+
+    // =========================================================
+    // REPRESENTATIVE ELEMENT
+    // =========================================================
+
+    private static string SelectRepresentativeElement(
         List<CompositionAnalyzer.ElementInfo> elements
     )
     {
-        foreach (CompositionAnalyzer.ElementInfo coral in elements)
+        if (
+            elements == null ||
+            elements.Count == 0
+        )
         {
-            if (coral.type != "coral") continue;
-            bool nearby = false;
-            foreach (CompositionAnalyzer.ElementInfo other in elements)
-            {
-                if (coral != other &&
-                    Vector2.Distance(coral.normalizedPosition,
-                                     other.normalizedPosition) <= 0.15f)
-                {
-                    nearby = true;
-                    break;
-                }
-            }
-            if (!nearby) return true;
+            return "";
         }
-        return false;
+
+        Dictionary<string, int> counts =
+            CountTypes(elements);
+
+        string best =
+            "";
+
+        int maximum =
+            -1;
+
+        List<string> types =
+            new List<string>(
+                counts.Keys
+            );
+
+        types.Sort(
+            StringComparer.Ordinal
+        );
+
+        foreach (
+            string type
+            in types
+        )
+        {
+            if (
+                counts[type] >
+                maximum
+            )
+            {
+                maximum =
+                    counts[type];
+
+                best =
+                    type;
+            }
+        }
+
+        return best;
     }
+
+    // =========================================================
+    // MOST COMMON TYPE
+    // =========================================================
+
+    private static string MostCommonType(
+        List<CompositionAnalyzer.ElementInfo> elements
+    )
+    {
+        return SelectRepresentativeElement(
+            elements
+        );
+    }
+
+    // =========================================================
+    // CONTAINS TYPE
+    // =========================================================
 
     private static bool ContainsType(
         List<CompositionAnalyzer.ElementInfo> elements,
         string type
     )
     {
-        foreach (CompositionAnalyzer.ElementInfo item in elements)
-            if (item.type == type) return true;
+        foreach (
+            CompositionAnalyzer.ElementInfo item
+            in elements
+        )
+        {
+            if (
+                item != null &&
+                item.type == type
+            )
+            {
+                return true;
+            }
+        }
+
         return false;
     }
 
-    private static CompositionAnalyzer.ElementInfo FirstOfType(
-        List<CompositionAnalyzer.ElementInfo> elements,
+    // =========================================================
+    // FIRST OF TYPE
+    // =========================================================
+
+    private static CompositionAnalyzer.ElementInfo
+        FirstOfType(
+            List<CompositionAnalyzer.ElementInfo> elements,
+            string type
+        )
+    {
+        foreach (
+            CompositionAnalyzer.ElementInfo item
+            in elements
+        )
+        {
+            if (
+                item != null &&
+                item.type == type
+            )
+            {
+                return item;
+            }
+        }
+
+        return null;
+    }
+
+    // =========================================================
+    // ZONE FOR POSITION
+    // =========================================================
+
+    private static string ZoneFor(
+        Vector2 position
+    )
+    {
+        int column =
+            Mathf.Clamp(
+                Mathf.FloorToInt(
+                    position.x * 3f
+                ),
+                0,
+                2
+            );
+
+        int row =
+            Mathf.Clamp(
+                Mathf.FloorToInt(
+                    position.y * 3f
+                ),
+                0,
+                2
+            );
+
+        string vertical =
+            row == 2
+                ? "TOP"
+                : row == 1
+                    ? "CENTER"
+                    : "BOTTOM";
+
+        string horizontal =
+            column == 0
+                ? "LEFT"
+                : column == 1
+                    ? "CENTER"
+                    : "RIGHT";
+
+        return vertical +
+               "_" +
+               horizontal;
+    }
+
+    // =========================================================
+    // PLACE
+    // =========================================================
+
+    private static string Place(
+        string zone
+    )
+    {
+        if (
+            string.IsNullOrEmpty(zone)
+        )
+        {
+            return "the scene";
+        }
+
+        return zone
+            .ToLowerInvariant()
+            .Replace(
+                "_",
+                "-"
+            );
+    }
+
+    // =========================================================
+    // SINGULAR
+    // =========================================================
+
+    private static string Singular(
         string type
     )
     {
-        foreach (CompositionAnalyzer.ElementInfo item in elements)
-            if (item.type == type) return item;
-        return elements[0];
+        switch (type)
+        {
+            case "light_trail":
+                return "light trail";
+
+            case "lantern":
+                return "lantern";
+
+            case "petals":
+                return "petal group";
+
+            case "fireworks":
+                return "firework";
+
+            case "water_current":
+                return "water current";
+
+            case "coral":
+                return "coral";
+
+            case "fish_school":
+                return "fish school";
+
+            case "bubble_burst":
+                return "bubble burst";
+
+            default:
+                return "element";
+        }
     }
 
-    private static string MostCommonType(
-        List<CompositionAnalyzer.ElementInfo> elements
+    // =========================================================
+    // PLURAL
+    // =========================================================
+
+    private static string Plural(
+        string type
     )
     {
-        Dictionary<string, int> counts = new Dictionary<string, int>();
-        foreach (CompositionAnalyzer.ElementInfo item in elements)
-        {
-            if (!counts.ContainsKey(item.type)) counts[item.type] = 0;
-            counts[item.type]++;
-        }
-
-        string best = "";
-        int maximum = 0;
-        List<string> types = new List<string>(counts.Keys);
-        types.Sort(StringComparer.Ordinal);
-        foreach (string type in types)
-            if (counts[type] > maximum) { best = type; maximum = counts[type]; }
-        return best;
-    }
-
-    private static string ZoneFor(Vector2 position)
-    {
-        int column = Mathf.Clamp(Mathf.FloorToInt(position.x * 3f), 0, 2);
-        int row = Mathf.Clamp(Mathf.FloorToInt(position.y * 3f), 0, 2);
-        string vertical = row == 2 ? "TOP" : row == 1 ? "CENTER" : "BOTTOM";
-        string horizontal = column == 0 ? "LEFT" : column == 1 ? "CENTER" : "RIGHT";
-        return vertical + "_" + horizontal;
-    }
-
-    private static string Place(string zone)
-    {
-        return zone.ToLowerInvariant().Replace("_", "-");
-    }
-
-    private static string Singular(string type)
-    {
         switch (type)
         {
-            case "light_trail": return "light trail";
-            case "lantern": return "lantern";
-            case "petals": return "petal group";
-            case "fireworks": return "firework";
-            case "water_current": return "water current";
-            case "coral": return "coral";
-            case "fish_school": return "fish school";
-            case "bubble_burst": return "bubble burst";
-            default: return "element";
-        }
-    }
+            case "light_trail":
+                return "light trails";
 
-    private static string Plural(string type)
-    {
-        switch (type)
-        {
-            case "light_trail": return "light trails";
-            case "lantern": return "lanterns";
-            case "petals": return "petal groups";
-            case "fireworks": return "fireworks";
-            case "water_current": return "water currents";
-            case "coral": return "coral";
-            case "fish_school": return "fish schools";
-            case "bubble_burst": return "bubble bursts";
-            default: return "elements";
+            case "lantern":
+                return "lanterns";
+
+            case "petals":
+                return "petal groups";
+
+            case "fireworks":
+                return "fireworks";
+
+            case "water_current":
+                return "water currents";
+
+            case "coral":
+                return "coral";
+
+            case "fish_school":
+                return "fish schools";
+
+            case "bubble_burst":
+                return "bubble bursts";
+
+            default:
+                return "elements";
         }
     }
 }
