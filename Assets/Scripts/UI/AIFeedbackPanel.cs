@@ -25,6 +25,16 @@ namespace BodyAsBrush.UI
 
         private Coroutine displayCoroutine;
 
+        private void OnEnable()
+        {
+            LanguageManager.LanguageChanged += RefreshTitle;
+        }
+
+        private void OnDisable()
+        {
+            LanguageManager.LanguageChanged -= RefreshTitle;
+        }
+
         private void Awake()
         {
             if (Instance != null && Instance != this)
@@ -44,17 +54,57 @@ namespace BodyAsBrush.UI
 
             if (feedbackText != null)
             {
-                // Force TMP rich-text parsing at runtime.
+                // Keep TextMeshPro rich-text parsing enabled for highlights.
                 feedbackText.richText = true;
             }
 
             if (titleText != null)
             {
-                titleText.text = "AI Feedback";
-
-                // Title does not need rich text.
                 titleText.richText = false;
+                RefreshTitle();
             }
+        }
+
+        private void OnDestroy()
+        {
+            if (Instance == this)
+            {
+                Instance = null;
+            }
+
+            LanguageManager.LanguageChanged -= RefreshTitle;
+        }
+
+        private bool IsTraditionalChinese()
+        {
+            return LanguageManager.IsTraditionalChinese;
+        }
+
+        private void RefreshTitle()
+        {
+            if (titleText == null)
+            {
+                return;
+            }
+
+            titleText.text = GetLocalizedTitle(false);
+        }
+
+        private string GetLocalizedTitle(bool isCreativeReview)
+        {
+            if (IsTraditionalChinese())
+            {
+                return isCreativeReview ? "AI 創作評析" : "AI 創作回饋";
+            }
+
+            return isCreativeReview ? "AI Creative Review" : "AI Feedback";
+        }
+
+        private string GetFallbackMessage()
+        {
+            return IsTraditionalChinese()
+                ? "繼續創作，探索更多可能！"
+                : "Keep creating and exploring!";
         }
 
         public void ShowFeedback(string message, int cooldownSeconds)
@@ -79,9 +129,7 @@ namespace BodyAsBrush.UI
 
             if (titleText != null)
             {
-                titleText.text = isCreativeReview
-                    ? "AI Creative Review"
-                    : "AI Feedback";
+                titleText.text = GetLocalizedTitle(isCreativeReview);
             }
 
             if (displayCoroutine != null)
@@ -99,13 +147,12 @@ namespace BodyAsBrush.UI
         {
             if (string.IsNullOrWhiteSpace(message))
             {
-                return "Keep creating and exploring!";
+                return GetFallbackMessage();
             }
 
             message = message.Trim();
 
-            // Remove any color tags that might already exist
-            // in an AI response.
+            // Remove any color tags that might already exist in an AI response.
             message = Regex.Replace(
                 message,
                 @"</?color(?:=[^>]*)?>",
@@ -113,12 +160,7 @@ namespace BodyAsBrush.UI
                 RegexOptions.IgnoreCase
             );
 
-            /*
-             * ONE highlighting pass.
-             *
-             * This prevents words such as "fish" from being
-             * highlighted again inside an existing <color> tag.
-             */
+            // Highlight English keywords only. Chinese feedback remains unchanged.
             string pattern =
                 @"coral|fish schools|movement|fish|bubbles|water|balance|composition|color|space";
 
@@ -148,7 +190,6 @@ namespace BodyAsBrush.UI
             canvasGroup.interactable = false;
             canvasGroup.blocksRaycasts = false;
 
-            // Fade in
             yield return StartCoroutine(
                 FadeCanvasGroup(
                     0f,
@@ -157,12 +198,8 @@ namespace BodyAsBrush.UI
                 )
             );
 
-            // Visible for 10 seconds
-            yield return new WaitForSeconds(
-                displayDuration
-            );
+            yield return new WaitForSeconds(displayDuration);
 
-            // Fade out
             yield return StartCoroutine(
                 FadeCanvasGroup(
                     1f,

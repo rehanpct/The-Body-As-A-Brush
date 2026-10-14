@@ -9,37 +9,26 @@ using System.Threading.Tasks;
 using UnityEngine;
 using Debug = UnityEngine.Debug;
 
-/// <summary>
-/// Speaks automatic AI feedback through the Windows voice installed on this PC.
-/// Manual review is routed by AIFeedbackClient directly to its text panel.
-/// </summary>
 public sealed class AIFeedbackVoice : MonoBehaviour
 {
     [Header("Windows Voice")]
     [SerializeField] private bool voiceEnabled = true;
     [SerializeField, Range(-10, 10)] private int speechRate = 0;
     [SerializeField, Range(0, 100)] private int volume = 100;
-    [SerializeField, Tooltip("Choose an installed Windows voice. If blank, Zira or the first installed voice is used.")]
-    private string windowsVoiceName = string.Empty;
-    [SerializeField, Tooltip("When enabled, new feedback interrupts the current speech. Otherwise, it is queued.")]
-    private bool interruptCurrentSpeech = true;
+    [SerializeField, Tooltip("Exact installed Windows voice name.")]
+    private string windowsVoiceName = "Microsoft Hanhan Desktop";
+    [SerializeField] private bool interruptCurrentSpeech = true;
 
     private const int SpeechTimeoutMilliseconds = 90000;
-
     private readonly object stateLock = new object();
     private readonly Queue<SpeechJob> pendingSpeech = new Queue<SpeechJob>();
     private readonly Queue<VoiceLog> pendingLogs = new Queue<VoiceLog>();
-
     private bool speechWorkerRunning;
     private bool shuttingDown;
     private Process activeProcess;
     private SpeechJob activeJob;
 
-    [Serializable]
-    private sealed class SpeechEnvelope
-    {
-        public string message;
-    }
+    [Serializable] private sealed class SpeechEnvelope { public string message; }
 
     private sealed class SpeechJob
     {
@@ -51,10 +40,7 @@ public sealed class AIFeedbackVoice : MonoBehaviour
 
         public SpeechJob(string text, int speechRate, int speechVolume, string selectedVoice)
         {
-            message = text;
-            rate = speechRate;
-            volume = speechVolume;
-            voiceName = selectedVoice;
+            message = text; rate = speechRate; volume = speechVolume; voiceName = selectedVoice;
         }
     }
 
@@ -62,74 +48,54 @@ public sealed class AIFeedbackVoice : MonoBehaviour
     {
         public readonly string message;
         public readonly bool warning;
-
-        public VoiceLog(string text, bool isWarning)
-        {
-            message = text;
-            warning = isWarning;
-        }
+        public VoiceLog(string text, bool isWarning) { message = text; warning = isWarning; }
     }
 
-    /// <summary>UnityEvent<string> receiver for automatic AI feedback.</summary>
     public void Speak(string message)
     {
-        if (!voiceEnabled)
-        {
-            Debug.Log("[AIFeedbackVoice] Voice disabled.");
-            return;
-        }
-
-        if (!IsWindows())
-        {
-            Debug.LogWarning("[AIFeedbackVoice] Windows TTS unavailable. Continuing without voice output.");
-            return;
-        }
+        Debug.Log("[AIFeedbackVoice][RECEIVED TEXT] " + (message ?? "<NULL>"));
+        if (!voiceEnabled) { Debug.Log("[AIFeedbackVoice] Voice disabled."); return; }
+        if (!IsWindows()) { Debug.LogWarning("[AIFeedbackVoice] Windows TTS is available only in Windows Editor/Player."); return; }
 
         string cleanMessage = CleanMessageForSpeech(message);
+        Debug.Log("[AIFeedbackVoice][CLEANED TEXT] " + (cleanMessage ?? "<NULL>"));
         if (string.IsNullOrWhiteSpace(cleanMessage))
         {
             Debug.LogWarning("[AIFeedbackVoice] No human-readable message to speak.");
             return;
         }
 
-        SpeechJob job = new SpeechJob(
-            cleanMessage,
-            Mathf.Clamp(speechRate, -10, 10),
-            Mathf.Clamp(volume, 0, 100),
-            windowsVoiceName == null ? string.Empty : windowsVoiceName.Trim()
-        );
+        string requestedVoice = string.IsNullOrWhiteSpace(windowsVoiceName) ? string.Empty : windowsVoiceName.Trim();
+        Debug.Log("[AIFeedbackVoice][REQUESTED VOICE] " +
+                  (string.IsNullOrEmpty(requestedVoice) ? "<automatic/default>" : requestedVoice));
+
+        SpeechJob job = new SpeechJob(cleanMessage, Mathf.Clamp(speechRate, -10, 10),
+            Mathf.Clamp(volume, 0, 100), requestedVoice);
 
         lock (stateLock)
         {
-            if (shuttingDown)
-                return;
-
+            if (shuttingDown) return;
             if (interruptCurrentSpeech)
             {
                 CancelActiveJobLocked();
-                while (pendingSpeech.Count > 0)
-                    pendingSpeech.Dequeue().cancelled = true;
+                while (pendingSpeech.Count > 0) pendingSpeech.Dequeue().cancelled = true;
             }
 
             pendingSpeech.Enqueue(job);
             if (!speechWorkerRunning)
             {
                 speechWorkerRunning = true;
-                try
-                {
-                    Task.Run(DrainSpeechQueue);
-                }
-                catch
+                try { Task.Run(DrainSpeechQueue); }
+                catch (Exception ex)
                 {
                     speechWorkerRunning = false;
                     pendingSpeech.Clear();
-                    Debug.LogWarning("[AIFeedbackVoice] Windows TTS unavailable. Continuing without voice output.");
+                    Debug.LogError("[AIFeedbackVoice] Could not start speech worker: " + ex);
                     return;
                 }
             }
         }
-
-        Debug.Log("[AIFeedbackVoice] Speaking automatic AI feedback.");
+        Debug.Log("[AIFeedbackVoice] Speech queued.");
     }
 
     private void Update()
@@ -139,58 +105,33 @@ public sealed class AIFeedbackVoice : MonoBehaviour
             VoiceLog entry;
             lock (stateLock)
             {
-                if (pendingLogs.Count == 0)
-                    return;
+                if (pendingLogs.Count == 0) return;
                 entry = pendingLogs.Dequeue();
             }
-
-            if (entry.warning)
-                Debug.LogWarning(entry.message);
-            else
-                Debug.Log(entry.message);
+            if (entry.warning) Debug.LogWarning(entry.message);
+            else Debug.Log(entry.message);
         }
     }
 
-    private void OnDisable()
-    {
-        CancelSpeech(false);
-    }
-
-    private void OnDestroy()
-    {
-        CancelSpeech(true);
-    }
+    private void OnDisable() { CancelSpeech(false); }
+    private void OnDestroy() { CancelSpeech(true); }
 
     private void CancelSpeech(bool destroying)
     {
         lock (stateLock)
         {
-            if (destroying)
-                shuttingDown = true;
-
+            if (destroying) shuttingDown = true;
             CancelActiveJobLocked();
-            while (pendingSpeech.Count > 0)
-                pendingSpeech.Dequeue().cancelled = true;
+            while (pendingSpeech.Count > 0) pendingSpeech.Dequeue().cancelled = true;
         }
     }
 
     private void CancelActiveJobLocked()
     {
-        if (activeJob != null)
-            activeJob.cancelled = true;
-
-        if (activeProcess == null)
-            return;
-
-        try
-        {
-            if (!activeProcess.HasExited)
-                activeProcess.Kill();
-        }
-        catch
-        {
-            // The process may have completed between the check and Kill.
-        }
+        if (activeJob != null) activeJob.cancelled = true;
+        if (activeProcess == null) return;
+        try { if (!activeProcess.HasExited) activeProcess.Kill(); }
+        catch { /* Process may have completed between checking and killing it. */ }
     }
 
     private void DrainSpeechQueue()
@@ -205,17 +146,10 @@ public sealed class AIFeedbackVoice : MonoBehaviour
                     speechWorkerRunning = false;
                     return;
                 }
-
                 job = pendingSpeech.Dequeue();
                 activeJob = job;
             }
-
-            if (job.cancelled)
-            {
-                FinishJob(job);
-                continue;
-            }
-
+            if (job.cancelled) { FinishJob(job); continue; }
             SpeakOnWorker(job);
         }
     }
@@ -225,94 +159,80 @@ public sealed class AIFeedbackVoice : MonoBehaviour
         Process process = null;
         try
         {
-            process = new Process();
-            process.StartInfo = BuildProcessStartInfo(job);
+            process = new Process { StartInfo = BuildProcessStartInfo(job), EnableRaisingEvents = true };
+            process.OutputDataReceived += (sender, args) =>
+            {
+                if (!string.IsNullOrEmpty(args.Data))
+                    QueueLog("[AIFeedbackVoice][POWERSHELL] " + args.Data, false);
+            };
+            process.ErrorDataReceived += (sender, args) =>
+            {
+                if (!string.IsNullOrEmpty(args.Data))
+                    QueueLog("[AIFeedbackVoice][POWERSHELL ERROR] " + args.Data, true);
+            };
 
             lock (stateLock)
             {
                 if (shuttingDown || job.cancelled)
                 {
-                    if (activeJob == job)
-                        activeJob = null;
+                    if (activeJob == job) activeJob = null;
+                    process.Dispose();
                     return;
                 }
-
-                if (!process.Start())
-                    throw new InvalidOperationException("PowerShell did not start.");
-
+                if (!process.Start()) throw new InvalidOperationException("PowerShell did not start.");
                 activeProcess = process;
             }
 
-            QueueLog("[AIFeedbackVoice] Speech started.", false);
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+            QueueLog("[AIFeedbackVoice] Speech process started.", false);
+            QueueLog("[AIFeedbackVoice][SENDING TO TTS] Requested voice: " +
+                (string.IsNullOrEmpty(job.voiceName) ? "<automatic/default>" : job.voiceName), false);
+            QueueLog("[AIFeedbackVoice][SENDING TO TTS] Exact text: 「" + job.message + "」", false);
+
             bool exited = process.WaitForExit(SpeechTimeoutMilliseconds);
-            if (!exited)
-            {
-                try { process.Kill(); }
-                catch { }
-            }
+            if (!exited) { try { process.Kill(); } catch { } }
+            if (exited) process.WaitForExit();
 
             int exitCode = exited ? process.ExitCode : -1;
             bool cancelled;
             lock (stateLock)
             {
-                if (activeProcess == process)
-                    activeProcess = null;
-                if (activeJob == job)
-                    activeJob = null;
+                if (activeProcess == process) activeProcess = null;
+                if (activeJob == job) activeJob = null;
                 cancelled = job.cancelled || shuttingDown;
             }
+            if (cancelled) return;
 
-            if (cancelled)
-                return;
-
-            if (exited && exitCode == 0)
-                QueueLog("[AIFeedbackVoice] Speech finished.", false);
-            else if (exited && exitCode == 4)
-                QueueLog("[AIFeedbackVoice] No Windows TTS voices available.", true);
-            else if (exited && exitCode == 5)
-            {
-                QueueLog("[AIFeedbackVoice] Selected voice not available: " + job.voiceName, true);
-                QueueLog("[AIFeedbackVoice] Falling back to Windows default voice.", true);
-                QueueLog("[AIFeedbackVoice] Speech finished.", false);
-            }
-            else
-                QueueLog("[AIFeedbackVoice] Windows TTS unavailable. Continuing without voice output.", true);
+            if (exited && exitCode == 0) QueueLog("[AIFeedbackVoice] Speech finished successfully.", false);
+            else if (exited && exitCode == 4) QueueLog("[AIFeedbackVoice] No enabled Windows TTS voices available.", true);
+            else if (exited && exitCode == 5) QueueLog("[AIFeedbackVoice] Requested voice not found. No fallback voice was used.", true);
+            else if (exited && exitCode == 6) QueueLog("[AIFeedbackVoice] Requested voice could not be selected. Speech was not spoken.", true);
+            else if (!exited) QueueLog("[AIFeedbackVoice] Speech timed out.", true);
+            else QueueLog("[AIFeedbackVoice] PowerShell TTS failed with exit code " + exitCode + ".", true);
         }
-        catch
+        catch (Exception ex)
         {
             bool cancelled;
             lock (stateLock)
             {
-                if (activeProcess == process)
-                    activeProcess = null;
-                if (activeJob == job)
-                    activeJob = null;
+                if (activeProcess == process) activeProcess = null;
+                if (activeJob == job) activeJob = null;
                 cancelled = job.cancelled || shuttingDown;
             }
-
-            if (!cancelled)
-                QueueLog("[AIFeedbackVoice] Windows TTS unavailable. Continuing without voice output.", true);
+            if (!cancelled) QueueLog("[AIFeedbackVoice] Speech process exception: " + ex, true);
         }
-        finally
-        {
-            if (process != null)
-                process.Dispose();
-        }
+        finally { if (process != null) process.Dispose(); }
     }
 
     private void FinishJob(SpeechJob job)
     {
-        lock (stateLock)
-        {
-            if (activeJob == job)
-                activeJob = null;
-        }
+        lock (stateLock) { if (activeJob == job) activeJob = null; }
     }
 
     private void QueueLog(string message, bool warning)
     {
-        lock (stateLock)
-            pendingLogs.Enqueue(new VoiceLog(message, warning));
+        lock (stateLock) pendingLogs.Enqueue(new VoiceLog(message, warning));
     }
 
     private static bool IsWindows()
@@ -324,28 +244,32 @@ public sealed class AIFeedbackVoice : MonoBehaviour
     private static ProcessStartInfo BuildProcessStartInfo(SpeechJob job)
     {
         string messageBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(job.message));
-        string voiceBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(job.voiceName));
+        string voiceBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(job.voiceName ?? string.Empty));
         string script =
             "$ErrorActionPreference='Stop';$synth=$null;try{" +
             "Add-Type -AssemblyName System.Speech;" +
             "$synth=New-Object System.Speech.Synthesis.SpeechSynthesizer;" +
             "$voices=@($synth.GetInstalledVoices()|Where-Object{$_.Enabled}|ForEach-Object{$_.VoiceInfo.Name});" +
-            "if($voices.Count -eq 0){$synth.Dispose();exit 4};" +
+            "Write-Output ('TTSINSTALLEDVOICES|' + ($voices -join ';'));" +
+            "if($voices.Count -eq 0){exit 4};" +
             "$voice=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('" + voiceBase64 + "'));" +
-            "if([string]::IsNullOrWhiteSpace($voice)){if($voices -contains 'Microsoft Zira Desktop'){$voice='Microsoft Zira Desktop'}else{$voice=$voices[0]}};" +
-            "$fallback=$false;if($voices -contains $voice){$synth.SelectVoice($voice)}else{$fallback=$true};" +
+            "if([string]::IsNullOrWhiteSpace($voice)){if($voices -contains 'Microsoft Hanhan Desktop'){$voice='Microsoft Hanhan Desktop'}elseif($voices -contains 'Microsoft Zira Desktop'){$voice='Microsoft Zira Desktop'}else{$voice=$voices[0]}};" +
+            "if($voices -notcontains $voice){Write-Output ('TTSVOICEERROR|Requested voice not installed or disabled: ' + $voice);exit 5};" +
+            "try{$synth.SelectVoice($voice)}catch{Write-Output ('TTSVOICEERROR|SelectVoice failed: ' + $_.Exception.Message);exit 6};" +
+            "Write-Output ('TTSVOICE|' + $synth.Voice.Name);" +
             "$synth.Rate=" + job.rate + ";" +
             "$synth.Volume=" + job.volume + ";" +
             "$text=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('" + messageBase64 + "'));" +
+            "Write-Output ('TTSTEXTBASE64|' + [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($text)));" +
+            "Write-Output ('TTSTEXT|' + $text);" +
             "if([string]::IsNullOrWhiteSpace($text)){exit 2};" +
-            "$synth.Speak($text);$synth.Dispose();if($fallback){exit 5}else{exit 0}" +
-            "}catch{if($null -ne $synth){$synth.Dispose()};exit 3}";
-        string encodedCommand = Convert.ToBase64String(Encoding.Unicode.GetBytes(script));
+            "$synth.Speak($text);$synth.Dispose();exit 0" +
+            "}catch{Write-Output ('TTSERROR|' + $_.Exception.ToString());if($null -ne $synth){$synth.Dispose()};exit 3}";
 
+        string encodedCommand = Convert.ToBase64String(Encoding.Unicode.GetBytes(script));
         string systemDirectory = Environment.GetFolderPath(Environment.SpecialFolder.System);
-        string executable = Path.Combine(systemDirectory, "WindowsPowerShell\\v1.0\\powershell.exe");
-        if (!File.Exists(executable))
-            executable = "powershell.exe";
+        string executable = Path.Combine(systemDirectory, @"WindowsPowerShell\v1.0\powershell.exe");
+        if (!File.Exists(executable)) executable = "powershell.exe";
 
         return new ProcessStartInfo
         {
@@ -353,49 +277,45 @@ public sealed class AIFeedbackVoice : MonoBehaviour
             Arguments = "-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -EncodedCommand " + encodedCommand,
             UseShellExecute = false,
             CreateNoWindow = true,
-            WindowStyle = ProcessWindowStyle.Hidden
+            WindowStyle = ProcessWindowStyle.Hidden,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            StandardOutputEncoding = Encoding.UTF8,
+            StandardErrorEncoding = Encoding.UTF8
         };
     }
 
     private static string CleanMessageForSpeech(string message)
     {
-        if (string.IsNullOrWhiteSpace(message))
-            return string.Empty;
-
+        if (string.IsNullOrWhiteSpace(message)) return string.Empty;
         string cleaned = message.Trim();
+
         if (cleaned.StartsWith("{", StringComparison.Ordinal))
         {
             try
             {
                 SpeechEnvelope envelope = JsonUtility.FromJson<SpeechEnvelope>(cleaned);
-                if (envelope == null || string.IsNullOrWhiteSpace(envelope.message))
-                    return string.Empty;
+                if (envelope == null || string.IsNullOrWhiteSpace(envelope.message)) return string.Empty;
                 cleaned = envelope.message;
             }
-            catch
-            {
-                return string.Empty;
-            }
+            catch { return string.Empty; }
         }
-        else if (cleaned.StartsWith("[", StringComparison.Ordinal) && cleaned.EndsWith("]", StringComparison.Ordinal))
-        {
-            return string.Empty;
-        }
+        else if (cleaned.StartsWith("[", StringComparison.Ordinal) &&
+                 cleaned.EndsWith("]", StringComparison.Ordinal)) return string.Empty;
 
         cleaned = WebUtility.HtmlDecode(cleaned);
-        cleaned = Regex.Replace(cleaned, @"(?s)\x60{3}.*?\x60{3}", " ");
-        cleaned = Regex.Replace(cleaned, @"(?im)^[ \t]*(?:feedbackType|action|priority|cooldownSeconds|requestId|sessionId|debug(?:ging)?(?:\s+info)?|unity\s+log)[ \t]*[:=][^\r\n]*(?:\r?\n|$)", " ");
+        cleaned = Regex.Replace(cleaned, @"(?s)`{3}.*?`{3}", " ");
+        cleaned = Regex.Replace(cleaned, @"(?im)^\s*\*?(?:feedbackType|action|priority|cooldownSeconds|requestId|sessionId|debug(?:ging)?(?:\s+info)?|unity\s+log)\*?\s*[:=][^\r\n]*(?:\r?\n|$)", " ");
         cleaned = Regex.Replace(cleaned, @"\[(?:AIFeedbackClient|AIFeedbackVoice|DEBUG|INFO|WARNING|ERROR)\]\s*", " ", RegexOptions.IgnoreCase);
-        cleaned = Regex.Replace(cleaned, @"\[(?<label>[^\]]+)\]\([^)]+\)", "$1");
+        cleaned = Regex.Replace(cleaned, @"\[([^\]]+)\]\([^)]+\)", "$1");
         cleaned = Regex.Replace(cleaned, @"</?[^>]+>", " ");
         cleaned = Regex.Replace(cleaned, @"\*\*(.*?)\*\*|__(.*?)__", "$1$2");
-        cleaned = Regex.Replace(cleaned, @"(?m)^[ \t]*(?:>[ \t]*|[-*+][ \t]+|\d+[.)][ \t]+)", " ");
-        cleaned = Regex.Replace(cleaned, @"[*_~#\x60]", " ");
+        cleaned = Regex.Replace(cleaned, @"(?m)^\s*(?:>\s*|[-*+]\s+|\d+[.)]\s+)", " ");
+        cleaned = Regex.Replace(cleaned, @"[*_~#`]", " ");
         cleaned = Regex.Replace(cleaned, @"\s+", " ").Trim();
 
-        if (cleaned.StartsWith("{", StringComparison.Ordinal) || cleaned.StartsWith("[", StringComparison.Ordinal))
-            return string.Empty;
-
+        if (cleaned.StartsWith("{", StringComparison.Ordinal) ||
+            cleaned.StartsWith("[", StringComparison.Ordinal)) return string.Empty;
         return cleaned;
     }
 }
