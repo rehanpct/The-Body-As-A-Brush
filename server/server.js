@@ -6,15 +6,9 @@ const OpenAI = require("openai");
 
 const crypto = require("crypto");
 
-
-
 dotenv.config();
 
-
-
 const app = express();
-
-
 
 // ============================================================
 
@@ -22,13 +16,9 @@ const app = express();
 
 // ============================================================
 
-
-
 let latestUnityPayload = null;
 
 let latestAIResponse = null;
-
-
 
 // ============================================================
 
@@ -36,31 +26,21 @@ let latestAIResponse = null;
 
 // ============================================================
 
-
-
 const CONFIG = {
 
   port: process.env.PORT || 3000,
-
-
 
   openaiApiKey:
 
     process.env.OPENAI_API_KEY || "",
 
-
-
   openaiModel:
 
     process.env.OPENAI_MODEL || "gpt-4o-mini",
 
-
-
   mockAI:
 
     String(process.env.MOCK_AI || "false").toLowerCase() === "true",
-
-
 
   rateLimitPerMinute:
 
@@ -68,15 +48,11 @@ const CONFIG = {
 
 };
 
-
-
 // ============================================================
 
 // OPENAI CLIENT
 
 // ============================================================
-
-
 
 const client = CONFIG.openaiApiKey
 
@@ -88,41 +64,58 @@ const client = CONFIG.openaiApiKey
 
   : null;
 
-
-
 // ============================================================
 
 // SYSTEM PROMPT
 
 // ============================================================
 
-
-
 function getResponseLanguage(body) {
+
   return body?.language === "zh-TW" ? "zh-TW" : "en";
+
 }
 
 function languageInstruction(language) {
+
   if (language === "zh-TW") {
+
     return [
+
       "LANGUAGE REQUIREMENT:",
+
       "Write every user-facing natural-language string in Traditional Chinese (繁體中文, Taiwan usage). Do not use Simplified Chinese.",
+
       "Keep JSON keys and machine-readable action fields in their exact canonical English values.",
+
       "Describe composition zones naturally in Traditional Chinese, for example: 左上方、上方中央、右上方、左側中央、畫面中央、右側中央、左下方、下方中央、右下方.",
+
       "Do not translate or alter action.type, action.target, or action.value."
+
     ].join("\n");
+
   }
+
   return [
+
     "LANGUAGE REQUIREMENT:",
+
     "Write all user-facing natural-language text in English.",
+
     "Keep JSON keys and machine-readable action fields in their exact canonical English values."
+
   ].join("\n");
+
 }
 
 function localizedFallbackMessage(body) {
-  return getResponseLanguage(body) === "zh-TW"
-    ? "目前無法取得足夠的主題資料，因此暫時無法提供完整的作品建議。"
-    : "The active theme data is unavailable, so a theme-specific review is not ready.";
+  if (getResponseLanguage(body) !== "zh-TW") {
+    return "The active theme data is unavailable, so a theme-specific review is not ready.";
+  }
+
+  return body?.context?.currentTheme === "Taiwan"
+    ? "目前無法取得足夠的台灣主題資料，因此暫時無法提供完整的作品建議。"
+    : "目前無法取得足夠的海底主題資料，因此暫時無法提供完整的作品建議。";
 }
 
 const SYSTEM_PROMPT = `
@@ -131,21 +124,13 @@ You are the AI Creative Director for "The Body as a Brush",
 
 a gesture-based interactive art experience.
 
-
-
 The user creates visual artwork using body gestures.
-
-
 
 Your job is to observe the artwork data and provide
 
 specific, useful, encouraging artistic guidance.
 
-
-
 This is an ART CREATION EXPERIENCE.
-
-
 
 Do NOT treat it as:
 
@@ -159,19 +144,13 @@ Do NOT treat it as:
 
 - a conventional video game
 
-
-
 ============================================================
 
 WHAT YOU ANALYZE
 
 ============================================================
 
-
-
 Analyze all artwork information provided by Unity.
-
-
 
 Unity's currentTheme, element types, counts, normalized positions,
 
@@ -185,15 +164,11 @@ as the factual basis for a suggestion. Recommend only an element
 
 allowed by currentTheme.
 
-
-
 Taiwan allows only: light_trail, lantern, petals, fireworks.
 
 Underwater allows only: water_current, coral, fish_school, bubble_burst.
 
 Never describe or recommend an element from the other theme.
-
-
 
 You may receive:
 
@@ -229,8 +204,6 @@ You may receive:
 
 - artwork progress
 
-
-
 Possible elements:
 
 - light_trail
@@ -249,57 +222,37 @@ Possible elements:
 
 - bubble_burst
 
-
-
 ============================================================
 
 MOST IMPORTANT RULE
 
 ============================================================
 
-
-
 Only make recommendations supported by the data.
 
-
-
 DO NOT invent objects or positions.
-
-
 
 If the upper area is empty,
 
 you may recommend adding something there.
 
-
-
 If the lower area is crowded,
 
 you may recommend adding something higher.
-
-
 
 If an object is unusually large,
 
 you may recommend reducing its size.
 
-
-
 If objects are clustered,
 
 you may recommend spreading them.
-
-
 
 If the composition is already balanced,
 
 say that it is balanced.
 
-
-
 Do not manufacture problems.
-
-
 
 ============================================================
 
@@ -307,11 +260,7 @@ SPATIAL REASONING
 
 ============================================================
 
-
-
 Normalized coordinates:
-
-
 
 X:
 
@@ -321,8 +270,6 @@ X:
 
 1.0 = far right
 
-
-
 Y:
 
 0.0 = bottom
@@ -331,99 +278,63 @@ Y:
 
 1.0 = top
 
-
-
 Use natural location descriptions.
-
-
 
 X 0.0–0.25:
 
 left
 
-
-
 X 0.25–0.45:
 
 left-center
-
-
 
 X 0.45–0.55:
 
 center
 
-
-
 X 0.55–0.75:
 
 right-center
-
-
 
 X 0.75–1.0:
 
 right
 
-
-
 Y 0.0–0.25:
 
 bottom
-
-
 
 Y 0.25–0.45:
 
 lower-middle
 
-
-
 Y 0.45–0.55:
 
 center
-
-
 
 Y 0.55–0.75:
 
 upper-middle
 
-
-
 Y 0.75–1.0:
 
 top
 
-
-
 Examples of good feedback:
-
-
 
 "The upper-right area is quite open."
 
-
-
 "Most of your elements are concentrated toward the lower-left."
-
-
 
 "Your fish are clustered near the center."
 
-
-
 "Your lanterns are concentrated on the right side."
-
-
 
 ============================================================
 
 SIZE ANALYSIS
 
 ============================================================
-
-
 
 Pay attention to:
 
@@ -433,13 +344,9 @@ Pay attention to:
 
 - relativeSize
 
-
-
 If one element is significantly larger than the other
 
 elements, mention it.
-
-
 
 Possible advice:
 
@@ -451,19 +358,11 @@ Possible advice:
 
 - add supporting elements around it
 
-
-
 A large object is NOT automatically bad.
-
-
 
 It may intentionally act as the focal point.
 
-
-
 Example:
-
-
 
 "Your coral is significantly larger than the other elements.
 
@@ -471,15 +370,11 @@ It works as a focal point, but adding a few smaller elements
 
 around it could improve balance."
 
-
-
 ============================================================
 
 DENSITY ANALYSIS
 
 ============================================================
-
-
 
 Compare:
 
@@ -487,19 +382,11 @@ Compare:
 
 - top vs bottom
 
-
-
 If one area is significantly more populated:
-
-
 
 Recommend adding something to the weaker area.
 
-
-
 Example:
-
-
 
 "Most of your elements are in the lower half.
 
@@ -507,11 +394,7 @@ Consider adding 1–2 smaller elements toward the top
 
 to create more visual depth."
 
-
-
 Do not recommend filling every empty area.
-
-
 
 ============================================================
 
@@ -519,15 +402,9 @@ EMPTY SPACE
 
 ============================================================
 
-
-
 Empty space is valuable.
 
-
-
 Do NOT automatically tell the user to fill it.
-
-
 
 Use empty space as:
 
@@ -541,23 +418,15 @@ Use empty space as:
 
 - depth
 
-
-
 If a large empty area weakens the composition,
 
 suggest one carefully chosen element.
 
-
-
 Example:
-
-
 
 "The upper-right has a lot of open space.
 
 A small fish school there could balance the scene."
-
-
 
 ============================================================
 
@@ -565,15 +434,9 @@ CLUSTERING
 
 ============================================================
 
-
-
 If objects are very close together:
 
-
-
 Explain that the area may feel crowded.
-
-
 
 Suggest:
 
@@ -583,11 +446,7 @@ Suggest:
 
 - using smaller elements
 
-
-
 Example:
-
-
 
 "Your coral and fish are forming a strong cluster
 
@@ -595,15 +454,11 @@ in the lower-left. Try placing the next fish school
 
 farther toward the upper-right."
 
-
-
 ============================================================
 
 UNDERWATER THEME
 
 ============================================================
-
-
 
 For underwater scenes, consider:
 
@@ -623,37 +478,25 @@ For underwater scenes, consider:
 
 - focal points
 
-
-
 Examples:
-
-
 
 "Your coral creates a strong base.
 
 Adding a few fish higher up would create more depth."
 
-
-
 "The lower area is becoming dense.
 
 Consider placing the next fish school in the upper-right."
 
-
-
 "The fish are nicely distributed.
 
 A few bubbles above the coral could connect the composition."
-
-
 
 ============================================================
 
 TAIWAN THEME
 
 ============================================================
-
-
 
 For Taiwan scenes, consider:
 
@@ -671,11 +514,7 @@ For Taiwan scenes, consider:
 
 - warm focal areas
 
-
-
 Examples:
-
-
 
 "The lower market area is visually strong.
 
@@ -683,29 +522,21 @@ Adding a few lanterns higher in the sky could balance
 
 the composition."
 
-
-
 "The lanterns are concentrated on one side.
 
 One or two smaller lanterns on the opposite side
 
 could improve balance."
 
-
-
 "The open sky gives the market scene breathing room.
 
 You do not need to fill all of it."
-
-
 
 ============================================================
 
 FEEDBACK TYPES
 
 ============================================================
-
-
 
 Use one of:
 
@@ -721,43 +552,29 @@ Use one of:
 
 - summary
 
-
-
 hint:
 
 A specific improvement.
-
-
 
 encouragement:
 
 A positive observation when something works.
 
-
-
 strategy:
 
 Higher-level creative direction.
-
-
 
 review:
 
 A broader evaluation of the current artwork.
 
-
-
 warning:
 
 Use only for a clear composition problem.
 
-
-
 summary:
 
 A concise overall evaluation.
-
-
 
 ============================================================
 
@@ -765,31 +582,17 @@ FEEDBACK QUALITY
 
 ============================================================
 
-
-
 Avoid generic feedback such as:
-
-
 
 "Nice artwork!"
 
-
-
 "Keep creating!"
-
-
 
 "Your artwork looks good!"
 
-
-
 unless followed by a specific observation.
 
-
-
 Prefer:
-
-
 
 "Your coral creates a strong focal point in the lower-left.
 
@@ -797,21 +600,15 @@ The upper-right is still open, so adding a small fish school
 
 there could improve visual balance."
 
-
-
 The ideal feedback contains:
 
+1\. What Unity measured in the artwork.
 
+2\. The measured location or distribution.
 
-1. What Unity measured in the artwork.
+3\. Why the CompositionAdvisor recommendation fits.
 
-2. The measured location or distribution.
-
-3. Why the CompositionAdvisor recommendation fits.
-
-4. One useful suggestion.
-
-
+4\. One useful suggestion.
 
 Do not name an element unless it appears in the current theme's
 
@@ -821,27 +618,17 @@ Do not describe a location unless the grid, element positions, or
 
 advisor zone support it.
 
-
-
 ============================================================
 
 DO NOT OVER-CORRECT
 
 ============================================================
 
-
-
 The goal is creative guidance, not perfection.
-
-
 
 Do not constantly tell the user to add something.
 
-
-
 Sometimes the correct feedback is:
-
-
 
 "The composition is already well balanced.
 
@@ -849,15 +636,11 @@ The central fish school gives the artwork a clear
 
 focal point. I would leave the upper area relatively open."
 
-
-
 ============================================================
 
 REVIEW MODE
 
 ============================================================
-
-
 
 When eventType is artwork_review and automatic is false,
 
@@ -869,15 +652,11 @@ area, one underused or crowded area when present, and up to two
 
 specific recommendations. Do not speak or address an audio output.
 
-
-
 For automatic requests, keep the feedback to one or two short sentences and
 
 paraphrase only the advisor's single factual recommendation. Unity's advisor is
 
 authoritative for the action, element, target zone, and reason.
-
-
 
 For automatic=true, copy context.advisor.action into action.type exactly,
 
@@ -891,11 +670,7 @@ spreading any element. Recommend only the advisor element. You may mention anoth
 
 when Unity measured it; never recommend a different element.
 
-
-
 For example:
-
-
 
 "The composition has a strong focal point in the lower-left.
 
@@ -905,19 +680,13 @@ middle area is becoming denser. Consider adding one
 
 small supporting element toward the upper-right."
 
-
-
 Do not produce a huge essay.
-
-
 
 ============================================================
 
 ACTION RULES
 
 ============================================================
-
-
 
 Valid actions:
 
@@ -943,15 +712,9 @@ Valid actions:
 
 - show_summary
 
-
-
 For manual requests (automatic=false), normally use:
 
-
-
 action.type = "none"
-
-
 
 For automatic requests, the action fields are the validated composition
 
@@ -959,15 +722,9 @@ recommendation, not a Unity control: echo the advisor action, element, and zone
 
 exactly as specified above. This rule overrides the manual action list.
 
-
-
 The AI should provide advice first.
 
-
-
 Do NOT directly control Unity.
-
-
 
 ============================================================
 
@@ -975,19 +732,13 @@ RESPONSE FORMAT
 
 ============================================================
 
-
-
 Return ONLY valid JSON.
-
-
 
 Use this exact structure. For automatic=true, keep these fields but set action.type,
 
 action.target, and action.value to the exact advisor action, element, and zone.
 
 The example below shows the manual-request defaults.
-
-
 
 {
 
@@ -1011,21 +762,13 @@ The example below shows the manual-request defaults.
 
 }
 
-
-
 For automatic requests, the message must be one or two concise sentences.
 
 For manual review feedback, it may be slightly longer.
 
-
-
 Do not use markdown.
 
-
-
 Do not use bullet points inside the message.
-
-
 
 ============================================================
 
@@ -1033,35 +776,19 @@ FINAL PRINCIPLE
 
 ============================================================
 
-
-
 Think like a thoughtful digital art teacher.
-
-
 
 Observe first.
 
-
-
 Explain what you see.
-
-
 
 Then give ONE useful creative suggestion.
 
-
-
 Be specific.
-
-
 
 Be encouraging.
 
-
-
 Be composition-aware.
-
-
 
 Never invent information that is not contained
 
@@ -1069,15 +796,11 @@ in the Unity artwork data.
 
 `;
 
-
-
 // ============================================================
 
 // MIDDLEWARE
 
 // ============================================================
-
-
 
 app.use(
 
@@ -1089,31 +812,21 @@ app.use(
 
 );
 
-
-
 // ============================================================
 
 // RATE LIMITING
 
 // ============================================================
 
-
-
 const requestHistory = new Map();
-
-
 
 function checkRateLimit(sessionId) {
 
   const now = Date.now();
 
-
-
   const existing =
 
     requestHistory.get(sessionId) || [];
-
-
 
   const recent =
 
@@ -1124,8 +837,6 @@ function checkRateLimit(sessionId) {
         now - timestamp < 60 * 1000
 
     );
-
-
 
   if (
 
@@ -1143,17 +854,11 @@ function checkRateLimit(sessionId) {
 
     );
 
-
-
     return false;
 
   }
 
-
-
   recent.push(now);
-
-
 
   requestHistory.set(
 
@@ -1163,21 +868,15 @@ function checkRateLimit(sessionId) {
 
   );
 
-
-
   return true;
 
 }
-
-
 
 // ============================================================
 
 // HELPERS
 
 // ============================================================
-
-
 
 function generateRequestId() {
 
@@ -1188,10 +887,6 @@ function generateRequestId() {
     .toString("hex")}`;
 
 }
-
-
-
-
 
 const THEME_ELEMENTS = {
 
@@ -1221,8 +916,6 @@ const THEME_ELEMENTS = {
 
 };
 
-
-
 const ELEMENT_MENTION_PATTERNS = {
 
   light_trail: /\b(?:light[\s_-]+)?trails?\b/i,
@@ -1243,8 +936,6 @@ const ELEMENT_MENTION_PATTERNS = {
 
 };
 
-
-
 function allowedElementsForTheme(theme) {
 
   if (theme === "Taiwan") return THEME_ELEMENTS.Taiwan;
@@ -1254,8 +945,6 @@ function allowedElementsForTheme(theme) {
   return [];
 
 }
-
-
 
 const AUTOMATIC_ADVISOR_ACTIONS = new Set([
 
@@ -1273,8 +962,6 @@ const AUTOMATIC_ADVISOR_ACTIONS = new Set([
 
 ]);
 
-
-
 const PLACEMENT_ADVISOR_ACTIONS = new Set([
 
   "BALANCE",
@@ -1284,8 +971,6 @@ const PLACEMENT_ADVISOR_ACTIONS = new Set([
   "ADD"
 
 ]);
-
-
 
 const COMPOSITION_ZONES = new Set([
 
@@ -1297,15 +982,11 @@ const COMPOSITION_ZONES = new Set([
 
 ]);
 
-
-
 function isAutomaticCompositionRequest(body) {
 
   return body?.automatic === true && body?.eventType !== "artwork_review";
 
 }
-
-
 
 function canonicalZoneName(value) {
 
@@ -1317,8 +998,6 @@ function canonicalZoneName(value) {
 
 }
 
-
-
 function getAutomaticAdvisor(context) {
 
   return context?.advisor && typeof context.advisor === "object"
@@ -1328,8 +1007,6 @@ function getAutomaticAdvisor(context) {
     : {};
 
 }
-
-
 
 function deterministicAdvisorAction(body) {
 
@@ -1353,8 +1030,6 @@ function deterministicAdvisorAction(body) {
 
 }
 
-
-
 function getMentionedZones(text) {
 
   const normalized = String(text || "")
@@ -1370,8 +1045,6 @@ function getMentionedZones(text) {
   const pattern = /\b(?:(top|upper|middle|bottom|lower)\s+(left|center|right)|(left|right)\s+center|center)\b/g;
 
   let match;
-
-
 
   while ((match = pattern.exec(normalized)) !== null) {
 
@@ -1403,8 +1076,6 @@ function getMentionedZones(text) {
 
   }
 
-
-
   const compass = [
 
     ["TOP_LEFT", /\bnorth\s*west\b/],
@@ -1423,13 +1094,9 @@ function getMentionedZones(text) {
 
   }
 
-
-
   return zones;
 
 }
-
-
 
 function countSentences(message) {
 
@@ -1442,8 +1109,6 @@ function countSentences(message) {
   return marks ? marks.length : 1;
 
 }
-
-
 
 function hasAlternativeElementRecommendation(message, recommendedElement, measuredElements) {
 
@@ -1467,8 +1132,6 @@ function hasAlternativeElementRecommendation(message, recommendedElement, measur
 
 }
 
-
-
 function validateAutomaticAdvisor(context) {
 
   const theme = context?.currentTheme;
@@ -1481,8 +1144,6 @@ function validateAutomaticAdvisor(context) {
 
   }
 
-
-
   const advisor = getAutomaticAdvisor(context);
 
   if (!AUTOMATIC_ADVISOR_ACTIONS.has(advisor.action)) {
@@ -1490,8 +1151,6 @@ function validateAutomaticAdvisor(context) {
     return { valid: false, reason: "Unity advisor action is missing or unsupported." };
 
   }
-
-
 
   const element = typeof advisor.element === "string" ? advisor.element : "";
 
@@ -1510,8 +1169,6 @@ function validateAutomaticAdvisor(context) {
       : []
 
   );
-
-
 
   if (advisor.action !== "NONE") {
 
@@ -1539,8 +1196,6 @@ function validateAutomaticAdvisor(context) {
 
   }
 
-
-
   const grid = Array.isArray(context?.grid) ? context.grid : [];
 
   let sourceZone = "";
@@ -1563,8 +1218,6 @@ function validateAutomaticAdvisor(context) {
 
   }
 
-
-
   if (PLACEMENT_ADVISOR_ACTIONS.has(advisor.action)) {
 
     const target = grid.find(item => canonicalZoneName(item?.name) === zone);
@@ -1583,13 +1236,9 @@ function validateAutomaticAdvisor(context) {
 
   }
 
-
-
   return { valid: true, reason: "", advisor, allowed, measured, zone, sourceZone };
 
 }
-
-
 
 function buildAdvisorFallback(body) {
 
@@ -1600,39 +1249,62 @@ function buildAdvisorFallback(body) {
   const isTraditionalChinese = getResponseLanguage(body) === "zh-TW";
 
   // Never reuse Unity's English fallbackMessage for a Traditional Chinese request.
+
   // The advisor's fallbackMessage is generated by Unity and may not be localized.
+
   const message = isTraditionalChinese
+
     ? (
+
         isReview
+
           ? "你的作品已經形成有趣的海底場景。試著調整珊瑚和魚群的位置，讓畫面更加平衡。"
+
           : "繼續探索你的作品構圖，嘗試不同的元素和位置，創造更有趣的海底世界！"
+
       )
+
     : (
+
         typeof body?.context?.advisor?.fallbackMessage === "string" &&
+
         body.context.advisor.fallbackMessage.trim()
+
           ? body.context.advisor.fallbackMessage.trim()
+
           : localizedFallbackMessage(body)
+
       );
 
   return {
+
     message,
+
     feedbackType: isReview ? "review" : "hint",
+
     action: automatic
+
       ? deterministicAdvisorAction(body)
+
       : { type: "none", target: "", value: "" },
+
     priority: "normal",
+
     cooldownSeconds: 20
+
   };
 
 }
 
 // Traditional Chinese output must contain Han characters. This prevents an
+
 // English model response from silently reaching a zh-TW UI or speech system.
+
 function containsChineseCharacters(value) {
+
   return typeof value === "string" && /[\u3400-\u4DBF\u4E00-\u9FFF]/u.test(value);
+
 }
-
-
 
 function validateAIResponse(feedback, body) {
 
@@ -1688,8 +1360,6 @@ function validateAIResponse(feedback, body) {
 
     : validActions.includes(feedback?.action?.type);
 
-
-
   if (!feedback || typeof feedback !== "object" ||
 
       typeof feedback.message !== "string" ||
@@ -1714,15 +1384,11 @@ function validateAIResponse(feedback, body) {
 
   }
 
-
-
   if (!(["normal", "high", "low"].includes(feedback.priority))) {
 
     return { valid: false, reason: "Invalid response priority." };
 
   }
-
-
 
   if (body?.eventType === "artwork_review" &&
 
@@ -1731,8 +1397,6 @@ function validateAIResponse(feedback, body) {
     return { valid: false, reason: "A manual review must use feedbackType review." };
 
   }
-
-
 
   const context = body?.context || {};
 
@@ -1745,8 +1409,6 @@ function validateAIResponse(feedback, body) {
     return { valid: false, reason: "The current theme is missing or unsupported." };
 
   }
-
-
 
   if (automatic) {
 
@@ -1776,9 +1438,8 @@ function validateAIResponse(feedback, body) {
 
     }
 
-
-
     const isTraditionalChinese = getResponseLanguage(body) === "zh-TW";
+
     const messageZones = isTraditionalChinese ? new Set() : getMentionedZones(feedback.message);
 
     for (const zone of messageZones) {
@@ -1791,17 +1452,15 @@ function validateAIResponse(feedback, body) {
 
     }
 
-
-
     if (!isTraditionalChinese &&
+
         PLACEMENT_ADVISOR_ACTIONS.has(advisor.action) &&
+
         !messageZones.has(advisorValidation.zone)) {
 
       return { valid: false, reason: "Automatic response does not preserve Unity's target zone in its message." };
 
     }
-
-
 
     const placementLanguage = /\b(?:add(?:ing)?|place(?:d|s|ing)?|put(?:ting)?|introduc(?:e|ing)|fill(?:ing)?|mov(?:e|ing)|spread(?:ing)?)\b/i;
 
@@ -1812,7 +1471,9 @@ function validateAIResponse(feedback, body) {
     }
 
     if (!isTraditionalChinese &&
+
         (advisor.action === "NONE" || advisor.action === "VARY_SIZE") &&
+
         placementLanguage.test(feedback.message)) {
 
       return { valid: false, reason: "Automatic response contains a different composition action." };
@@ -1820,13 +1481,12 @@ function validateAIResponse(feedback, body) {
     }
 
     if (!isTraditionalChinese &&
+
         hasAlternativeElementRecommendation(feedback.message, advisor.element, advisorValidation.measured)) {
 
       return { valid: false, reason: "Automatic response recommends a measured element other than Unity's advisor element." };
 
     }
-
-
 
     const actionLanguage = {
 
@@ -1852,8 +1512,6 @@ function validateAIResponse(feedback, body) {
 
   }
 
-
-
   const present = new Set();
 
   if (Array.isArray(context.elements)) {
@@ -1870,8 +1528,6 @@ function validateAIResponse(feedback, body) {
 
   }
 
-
-
   if (advisor.element && advisor.action !== "NONE") {
 
     if (!allowed.includes(advisor.element)) {
@@ -1884,8 +1540,6 @@ function validateAIResponse(feedback, body) {
 
   }
 
-
-
   const combinedText =
 
     feedback.message + " " +
@@ -1893,8 +1547,6 @@ function validateAIResponse(feedback, body) {
     feedback.action.target + " " +
 
     feedback.action.value;
-
-
 
   for (const [element, pattern] of Object.entries(ELEMENT_MENTION_PATTERNS)) {
 
@@ -1926,8 +1578,6 @@ function validateAIResponse(feedback, body) {
 
   }
 
-
-
   if (!automatic && feedback.action.type === "show_composition_hint" &&
 
       feedback.action.value) {
@@ -1954,21 +1604,15 @@ function validateAIResponse(feedback, body) {
 
   }
 
-
-
   return { valid: true, reason: "" };
 
 }
-
-
 
 // ============================================================
 
 // NORMALIZE AI RESPONSE
 
 // ============================================================
-
-
 
 function normalizeFeedback(feedback, body = {}) {
 
@@ -1987,8 +1631,6 @@ function normalizeFeedback(feedback, body = {}) {
     "summary"
 
   ];
-
-
 
   const validActions = [
 
@@ -2016,8 +1658,6 @@ function normalizeFeedback(feedback, body = {}) {
 
   ];
 
-
-
   const result = {
 
     message:
@@ -2027,8 +1667,6 @@ function normalizeFeedback(feedback, body = {}) {
         ? feedback.message.trim()
 
         : (getResponseLanguage(body) === "zh-TW" ? "繼續探索你的作品構圖。" : "Keep exploring your composition."),
-
-
 
     feedbackType:
 
@@ -2041,8 +1679,6 @@ function normalizeFeedback(feedback, body = {}) {
         ? feedback.feedbackType
 
         : "encouragement",
-
-
 
     action: {
 
@@ -2058,8 +1694,6 @@ function normalizeFeedback(feedback, body = {}) {
 
           : "none",
 
-
-
       target:
 
         typeof feedback?.action?.target === "string"
@@ -2067,8 +1701,6 @@ function normalizeFeedback(feedback, body = {}) {
           ? feedback.action.target
 
           : "",
-
-
 
       value:
 
@@ -2080,8 +1712,6 @@ function normalizeFeedback(feedback, body = {}) {
 
     },
 
-
-
     priority:
 
       feedback?.priority === "high" ||
@@ -2091,8 +1721,6 @@ function normalizeFeedback(feedback, body = {}) {
         ? feedback.priority
 
         : "normal",
-
-
 
     cooldownSeconds:
 
@@ -2108,13 +1736,9 @@ function normalizeFeedback(feedback, body = {}) {
 
   };
 
-
-
   return result;
 
 }
-
-
 
 // ============================================================
 
@@ -2122,23 +1746,17 @@ function normalizeFeedback(feedback, body = {}) {
 
 // ============================================================
 
-
-
 function generateMockFeedback(body) {
 
   return buildAdvisorFallback(body);
 
 }
 
-
-
 // ============================================================
 
 // ROBUST OPENAI JSON PARSER
 
 // ============================================================
-
-
 
 function parseAIJson(outputText) {
 
@@ -2148,19 +1766,13 @@ function parseAIJson(outputText) {
 
   }
 
-
-
   let cleanedOutput = outputText.trim();
-
-
 
   // ----------------------------------------------------------
 
   // Remove Markdown code fences
 
   // ----------------------------------------------------------
-
-
 
   cleanedOutput = cleanedOutput
 
@@ -2170,15 +1782,11 @@ function parseAIJson(outputText) {
 
     .trim();
 
-
-
   // ----------------------------------------------------------
 
   // Direct JSON parse
 
   // ----------------------------------------------------------
-
-
 
   try {
 
@@ -2192,27 +1800,19 @@ function parseAIJson(outputText) {
 
   }
 
-
-
   // ----------------------------------------------------------
 
   // Extract JSON object if OpenAI added surrounding text
 
   // ----------------------------------------------------------
 
-
-
   const firstBrace =
 
     cleanedOutput.indexOf("{");
 
-
-
   const lastBrace =
 
     cleanedOutput.lastIndexOf("}");
-
-
 
   if (
 
@@ -2232,8 +1832,6 @@ function parseAIJson(outputText) {
 
       );
 
-
-
     try {
 
       return JSON.parse(jsonCandidate);
@@ -2252,8 +1850,6 @@ function parseAIJson(outputText) {
 
   }
 
-
-
   throw new Error(
 
     "OpenAI response did not contain valid JSON."
@@ -2262,15 +1858,48 @@ function parseAIJson(outputText) {
 
 }
 
-
-
 // ============================================================
 
 // OPENAI FEEDBACK
 
 // ============================================================
 
+function localizedAdvisorMessage(body) {
+  const advisor = getAutomaticAdvisor(body?.context);
+  const action = String(advisor.action || "NONE").toUpperCase();
+  const theme = body?.context?.currentTheme;
+  const elementNames = {
+    light_trail: "光軌", lantern: "燈籠", petals: "花瓣",
+    fireworks: "煙火", water_current: "水流", coral: "珊瑚",
+    fish_school: "魚群", bubble_burst: "氣泡"
+  };
+  const zoneNames = {
+    TOP_LEFT: "左上方", TOP_CENTER: "上方中央", TOP_RIGHT: "右上方",
+    MIDDLE_LEFT: "左側中央", MIDDLE_CENTER: "畫面中央",
+    MIDDLE_RIGHT: "右側中央", BOTTOM_LEFT: "左下方",
+    BOTTOM_CENTER: "下方中央", BOTTOM_RIGHT: "右下方"
+  };
+  const element = elementNames[advisor.element] || (theme === "Taiwan" ? "場景元素" : "海底元素");
+  const zone = zoneNames[canonicalZoneName(advisor.zone)] || "適當的位置";
 
+  switch (action) {
+    case "ADD":
+      return `試著在${zone}加入一個${element}，為畫面增添層次並改善視覺平衡。`;
+    case "SPREAD":
+      return `目前的${element}分布較集中。試著將下一個${element}放在${zone}，讓畫面更均衡。`;
+    case "BALANCE":
+      return `試著調整${element}在${zone}附近的分布，讓畫面的視覺重量更加平衡。`;
+    case "VARY_SIZE":
+      return `試著改變${element}的大小，讓畫面有更多層次，同時保留清楚的視覺焦點。`;
+    case "LEAVE_OPEN":
+      return `目前的構圖可以保留更多留白。建議讓${zone}保持開闊，突顯主要視覺焦點。`;
+    case "NONE":
+    default:
+      return theme === "Taiwan"
+        ? "你的台灣主題作品正在形成完整的構圖。繼續觀察燈籠、光軌、花瓣與煙火的分布，並保留適當留白。"
+        : "你的海底作品正在形成完整的構圖。繼續觀察珊瑚、魚群、氣泡與水流的分布，並保留適當留白。";
+  }
+}
 
 async function generateAIFeedback(body) {
 
@@ -2279,8 +1908,6 @@ async function generateAIFeedback(body) {
     return generateMockFeedback(body);
 
   }
-
-
 
   if (!client) {
 
@@ -2291,8 +1918,6 @@ async function generateAIFeedback(body) {
     );
 
   }
-
-
 
   const userContent =
 
@@ -2306,25 +1931,17 @@ async function generateAIFeedback(body) {
 
           body.eventType,
 
-
-
         automatic:
 
           body.automatic === true,
-
-
 
         sessionId:
 
           body.sessionId,
 
-
-
         occurredAtUtc:
 
           body.occurredAtUtc,
-
-
 
         context:
 
@@ -2338,8 +1955,6 @@ async function generateAIFeedback(body) {
 
     );
 
-
-
   const response =
 
     await client.responses.create({
@@ -2348,13 +1963,9 @@ async function generateAIFeedback(body) {
 
         CONFIG.openaiModel,
 
-
-
       instructions:
 
         SYSTEM_PROMPT + "\n\n" + languageInstruction(getResponseLanguage(body)),
-
-
 
       input:
 
@@ -2362,17 +1973,11 @@ async function generateAIFeedback(body) {
 
     });
 
-
-
   const outputText =
 
     response.output_text || "";
 
-
-
   let parsed;
-
-
 
   try {
 
@@ -2390,15 +1995,11 @@ async function generateAIFeedback(body) {
 
     );
 
-
-
     console.error(
 
       error.message
 
     );
-
-
 
     console.error(
 
@@ -2407,8 +2008,6 @@ async function generateAIFeedback(body) {
       outputText
 
     );
-
-
 
     // IMPORTANT:
 
@@ -2420,24 +2019,29 @@ async function generateAIFeedback(body) {
 
   }
 
-
-
   if (
+
     getResponseLanguage(body) === "zh-TW" &&
+
     !containsChineseCharacters(parsed?.message)
+
   ) {
+
     console.warn(
+
       "[OPENAI LANGUAGE REJECTED]",
+
       "Requested Traditional Chinese, but the response message contained no Chinese characters. Returning localized fallback."
+
     );
+
     return buildAdvisorFallback(body);
+
   }
 
   const validation =
 
     validateAIResponse(parsed, body);
-
-
 
   if (!validation.valid) {
 
@@ -2453,31 +2057,34 @@ async function generateAIFeedback(body) {
 
   }
 
-
-
   const normalized = normalizeFeedback(parsed, body);
 
   if (isAutomaticCompositionRequest(body)) {
-
-    // The model's fields were checked above; keep Unity's exact action contract.
-
+    // Preserve Unity's canonical action contract.
     normalized.action = deterministicAdvisorAction(body);
 
+    // Force localized, data-driven Traditional Chinese for automatic feedback.
+    if (getResponseLanguage(body) === "zh-TW") {
+      normalized.message = localizedAdvisorMessage(body);
+    }
+  }
+
+  // Final safety check: never send an English message into zh-TW mode.
+  if (
+    getResponseLanguage(body) === "zh-TW" &&
+    !containsChineseCharacters(normalized.message)
+  ) {
+    normalized.message = localizedFallbackMessage(body);
   }
 
   return normalized;
-
 }
-
-
 
 // ============================================================
 
 // HEALTH ENDPOINT
 
 // ============================================================
-
-
 
 app.get(
 
@@ -2489,25 +2096,17 @@ app.get(
 
       status: "ok",
 
-
-
       service:
 
         "the-body-as-a-brush",
-
-
 
       timestamp:
 
         new Date().toISOString(),
 
-
-
       mockMode:
 
         CONFIG.mockAI,
-
-
 
       openaiConfigured:
 
@@ -2516,8 +2115,6 @@ app.get(
           CONFIG.openaiApiKey
 
         ),
-
-
 
       model:
 
@@ -2529,15 +2126,11 @@ app.get(
 
 );
 
-
-
 // ============================================================
 
 // DEBUG ENDPOINT
 
 // ============================================================
-
-
 
 app.get(
 
@@ -2567,8 +2160,6 @@ app.get(
 
     }
 
-
-
     return res
 
       .status(200)
@@ -2578,8 +2169,6 @@ app.get(
         unityToRender:
 
           latestUnityPayload,
-
-
 
         renderToUnity:
 
@@ -2591,15 +2180,11 @@ app.get(
 
 );
 
-
-
 // ============================================================
 
 // FEEDBACK ENDPOINT
 
 // ============================================================
-
-
 
 app.post(
 
@@ -2611,13 +2196,9 @@ app.post(
 
       Date.now();
 
-
-
     const requestId =
 
       generateRequestId();
-
-
 
     try {
 
@@ -2627,13 +2208,9 @@ app.post(
 
       // --------------------------------------------------------
 
-
-
       const body =
 
         req.body;
-
-
 
       // --------------------------------------------------------
 
@@ -2641,29 +2218,21 @@ app.post(
 
       // --------------------------------------------------------
 
-
-
       latestUnityPayload = {
 
         receivedAt:
 
           new Date().toISOString(),
 
-
-
         ...body
 
       };
-
-
 
       // --------------------------------------------------------
 
       // VALIDATION
 
       // --------------------------------------------------------
-
-
 
       if (
 
@@ -2687,8 +2256,6 @@ app.post(
 
       }
 
-
-
       if (
 
         body.projectType !==
@@ -2710,8 +2277,6 @@ app.post(
           });
 
       }
-
-
 
       if (
 
@@ -2737,8 +2302,6 @@ app.post(
 
       }
 
-
-
       if (
 
         !body.eventType ||
@@ -2763,15 +2326,11 @@ app.post(
 
       }
 
-
-
       // --------------------------------------------------------
 
       // RATE LIMIT
 
       // --------------------------------------------------------
-
-
 
       if (
 
@@ -2793,11 +2352,7 @@ app.post(
 
               "Rate limit exceeded. Please wait before sending another request.",
 
-
-
             requestId,
-
-
 
             sessionId:
 
@@ -2807,15 +2362,11 @@ app.post(
 
       }
 
-
-
       // --------------------------------------------------------
 
       // LOG REQUEST
 
       // --------------------------------------------------------
-
-
 
       console.log(
 
@@ -2823,15 +2374,11 @@ app.post(
 
       );
 
-
-
       console.log(
 
         "[FEEDBACK] Unity request received"
 
       );
-
-
 
       console.log(
 
@@ -2841,8 +2388,6 @@ app.post(
 
       );
 
-
-
       console.log(
 
         "Session ID:",
@@ -2850,8 +2395,6 @@ app.post(
         body.sessionId
 
       );
-
-
 
       console.log(
 
@@ -2861,15 +2404,11 @@ app.post(
 
       );
 
-
-
       console.log(
 
         "Unity Payload:"
 
       );
-
-
 
       console.log(
 
@@ -2885,15 +2424,11 @@ app.post(
 
       );
 
-
-
       // --------------------------------------------------------
 
       // GENERATE AI
 
       // --------------------------------------------------------
-
-
 
       const feedback =
 
@@ -2903,15 +2438,11 @@ app.post(
 
         );
 
-
-
       // --------------------------------------------------------
 
       // STORE RESPONSE
 
       // --------------------------------------------------------
-
-
 
       latestAIResponse = {
 
@@ -2919,29 +2450,19 @@ app.post(
 
           new Date().toISOString(),
 
-
-
         requestId,
-
-
 
         sessionId:
 
           body.sessionId,
 
-
-
         eventType:
 
           body.eventType,
 
-
-
         feedback
 
       };
-
-
 
       // --------------------------------------------------------
 
@@ -2949,15 +2470,11 @@ app.post(
 
       // --------------------------------------------------------
 
-
-
       const latencyMs =
 
         Date.now() -
 
         requestStartedAt;
-
-
 
       // --------------------------------------------------------
 
@@ -2965,15 +2482,11 @@ app.post(
 
       // --------------------------------------------------------
 
-
-
       console.log(
 
         "\n[FEEDBACK] AI response generated"
 
       );
-
-
 
       console.log(
 
@@ -2983,8 +2496,6 @@ app.post(
 
       );
 
-
-
       console.log(
 
         "Latency:",
@@ -2993,15 +2504,11 @@ app.post(
 
       );
 
-
-
       console.log(
 
         "AI Response:"
 
       );
-
-
 
       console.log(
 
@@ -3017,23 +2524,17 @@ app.post(
 
       );
 
-
-
       console.log(
 
         "============================================================\n"
 
       );
 
-
-
       // --------------------------------------------------------
 
       // RESPONSE TO UNITY
 
       // --------------------------------------------------------
-
-
 
       return res
 
@@ -3043,37 +2544,25 @@ app.post(
 
           requestId,
 
-
-
           sessionId:
 
             body.sessionId,
-
-
 
           message:
 
             feedback.message,
 
-
-
           feedbackType:
 
             feedback.feedbackType,
-
-
 
           action:
 
             feedback.action,
 
-
-
           priority:
 
             feedback.priority,
-
-
 
           cooldownSeconds:
 
@@ -3091,15 +2580,11 @@ app.post(
 
       );
 
-
-
       console.error(
 
         error
 
       );
-
-
 
       return res
 
@@ -3111,11 +2596,7 @@ app.post(
 
             "Failed to generate AI feedback.",
 
-
-
           requestId,
-
-
 
           details:
 
@@ -3131,15 +2612,11 @@ app.post(
 
 );
 
-
-
 // ============================================================
 
 // ROOT
 
 // ============================================================
-
-
 
 app.get(
 
@@ -3157,8 +2634,6 @@ app.get(
 
         <title>The Body as a Brush</title>
 
-
-
         <style>
 
           body {
@@ -3173,15 +2648,11 @@ app.get(
 
           }
 
-
-
           h1 {
 
             margin-bottom: 10px;
 
           }
-
-
 
           .card {
 
@@ -3195,8 +2666,6 @@ app.get(
 
           }
 
-
-
           code {
 
             background: #0a101a;
@@ -3206,8 +2675,6 @@ app.get(
             border-radius: 5px;
 
           }
-
-
 
           a {
 
@@ -3219,23 +2686,17 @@ app.get(
 
       </head>
 
-
-
       <body>
 
         <div class="card">
 
           <h1>The Body as a Brush</h1>
 
-
-
           <p>
 
             AI feedback backend is running.
 
           </p>
-
-
 
           <p>
 
@@ -3248,8 +2709,6 @@ app.get(
             </a>
 
           </p>
-
-
 
           <p>
 
@@ -3275,15 +2734,11 @@ app.get(
 
 );
 
-
-
 // ============================================================
 
 // ERROR HANDLER
 
 // ============================================================
-
-
 
 app.use(
 
@@ -3307,8 +2762,6 @@ app.use(
 
     );
 
-
-
     if (
 
       res.headersSent
@@ -3318,8 +2771,6 @@ app.use(
       return next(err);
 
     }
-
-
 
     return res
 
@@ -3337,15 +2788,11 @@ app.use(
 
 );
 
-
-
 // ============================================================
 
 // SERVER START
 
 // ============================================================
-
-
 
 app.listen(
 
@@ -3359,23 +2806,17 @@ app.listen(
 
     );
 
-
-
     console.log(
 
       "The Body as a Brush AI Backend"
 
     );
 
-
-
     console.log(
 
       "============================================================"
 
     );
-
-
 
     console.log(
 
@@ -3385,8 +2826,6 @@ app.listen(
 
     );
 
-
-
     console.log(
 
       "Model:",
@@ -3395,8 +2834,6 @@ app.listen(
 
     );
 
-
-
     console.log(
 
       "Mock AI:",
@@ -3404,8 +2841,6 @@ app.listen(
       CONFIG.mockAI
 
     );
-
-
 
     console.log(
 
@@ -3419,8 +2854,6 @@ app.listen(
 
     );
 
-
-
     console.log(
 
       "Health endpoint:",
@@ -3428,8 +2861,6 @@ app.listen(
       "/api/health"
 
     );
-
-
 
     console.log(
 
@@ -3439,8 +2870,6 @@ app.listen(
 
     );
 
-
-
     console.log(
 
       "Debug endpoint:",
@@ -3448,8 +2877,6 @@ app.listen(
       "/api/debug/latest"
 
     );
-
-
 
     console.log(
 
