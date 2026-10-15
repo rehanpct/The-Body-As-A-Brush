@@ -10,6 +10,22 @@ using UnityEngine.Events;
 public class AIFeedbackClient : MonoBehaviour
 {
     public static AIFeedbackClient Instance;
+    public string LatestFeedback { get; private set; }
+    public string LatestFeedbackLanguage { get; private set; }
+    public string LatestFeedbackTheme { get; private set; }
+    private bool latestFeedbackIsReview;
+
+    private void OnEnable() { LanguageManager.LanguageChanged += InvalidateFeedbackLanguage; }
+    private void OnDisable() { LanguageManager.LanguageChanged -= InvalidateFeedbackLanguage; }
+    private void InvalidateFeedbackLanguage()
+    {
+        LatestFeedback = null;
+        LatestFeedbackLanguage = null;
+        LatestFeedbackTheme = null;
+        lastDeliveredAdvisorSignature = null;
+        lastDeliveredCompositionStateSignature = null;
+        NotifyArtworkChanged("language_changed");
+    }
     // ============================================================
     // RENDER BACKEND
     // ============================================================
@@ -490,47 +506,25 @@ public class AIFeedbackClient : MonoBehaviour
     // ============================================================
     public void RequestArtworkReview()
     {
-        if (isRequestInProgress)
+        // Preserve the existing button binding; displaying text never requests or speaks feedback.
+        Debug.Log("[ManualFeedback] Button clicked.");
+        AIFeedbackPanel panel = AIFeedbackPanel.Instance;
+        if (panel == null)
+            panel = FindAnyObjectByType<AIFeedbackPanel>(FindObjectsInactive.Include);
+        if (panel == null)
         {
-            Debug.Log(
-                "[AIFeedbackClient] " +
-                "Review skipped — " +
-                "request already in progress."
-            );
+            Debug.LogError("[ManualFeedback] Missing BodyAsBrush.UI.AIFeedbackPanel in DrawingScene.", this);
             return;
         }
-        if (!CanSendRequest())
-        {
-            return;
-        }
-        if (
-            CompositionAnalyzer.Instance ==
-            null
-        )
-        {
-            Debug.LogWarning(
-                "[AIFeedbackClient] " +
-                "CompositionAnalyzer not found."
-            );
-            return;
-        }
-        CompositionAnalyzer.CompositionSnapshot snapshot =
-            CompositionAnalyzer.Instance.Analyze();
-        if (snapshot == null)
-        {
-            Debug.LogWarning(
-                "[AIFeedbackClient] " +
-                "Could not create artwork snapshot."
-            );
-            return;
-        }
-        StartCoroutine(
-            SendCompositionRequest(
-                snapshot,
-                "artwork_review",
-                false
-            )
-        );
+
+        bool hasFeedback = LatestFeedbackLanguage == LanguageManager.CurrentLanguage &&
+            !string.IsNullOrWhiteSpace(LatestFeedback);
+        Debug.Log("[ManualFeedback] Opening feedback panel.");
+        Debug.Log(hasFeedback
+            ? "[ManualFeedback] Displaying latest feedback: " + LatestFeedback
+            : "[ManualFeedback] No accepted feedback for the current language; using the existing panel fallback.");
+        panel.ShowFeedback(hasFeedback ? LatestFeedback : null,
+            Mathf.RoundToInt(currentCooldown), hasFeedback && latestFeedbackIsReview);
     }
     // ============================================================
     // REQUEST COOLDOWN
@@ -864,6 +858,8 @@ public class AIFeedbackClient : MonoBehaviour
                         snapshot
                     )
             };
+        Debug.Log("[AI] CAPTRACK_LANGUAGE = " + PlayerPrefs.GetString("CAPTRACK_LANGUAGE", "en") +
+            "; Requested language: " + request.language + "; Theme: " + request.context.currentTheme);
         string json =
             JsonUtility.ToJson(
                 request
@@ -911,6 +907,16 @@ public class AIFeedbackClient : MonoBehaviour
                 UnityWebRequest.Result.Success
             )
             {
+                Debug.Log("[AI] Response language requested: " + request.language +
+                    "; Raw response: " + webRequest.downloadHandler.text);
+                if (request.language != LanguageManager.CurrentLanguage)
+                {
+                    Debug.LogWarning("[AI] Discarded stale response after language changed from " +
+                        request.language + " to " + LanguageManager.CurrentLanguage);
+                    if (automatic)
+                        NotifyArtworkChanged("language_changed");
+                    yield break;
+                }
                 if (
                     automatic &&
                     requestCompositionVersion !=
@@ -1814,6 +1820,18 @@ public class AIFeedbackClient : MonoBehaviour
                 response.message
             );
         }
+        if (!automatic && LanguageManager.IsTraditionalChinese &&
+            !Regex.IsMatch(response.message, @"[\u3400-\u4DBF\u4E00-\u9FFF]"))
+        {
+            Debug.LogError("[AI] Rejected English review for zh-TW. Check the deployed backend language instruction. Text: " + response.message);
+            response.message = "目前無法取得繁體中文評析，請稍後再試。";
+        }
+        LatestFeedback = response.message;
+        LatestFeedbackLanguage = LanguageManager.CurrentLanguage;
+        LatestFeedbackTheme = expectedContext != null ? expectedContext.currentTheme : "";
+        latestFeedbackIsReview = response.feedbackType == "review";
+        Debug.Log("[AIFeedback] Accepted feedback: " + LatestFeedback);
+        Debug.Log("[AI] Language = " + LatestFeedbackLanguage + "; Response = " + LatestFeedback);
         // ========================================================
         // DEBUG INFORMATION
         // ========================================================
@@ -1853,66 +1871,12 @@ public class AIFeedbackClient : MonoBehaviour
                 response.action.value
             );
         }
-        // Automatic feedback is routed only to the configured voice output.
-        // Manual reviews remain text-only in the review panel.
-        if (
-            automatic
-        )
-        {
-            RememberDeliveredAutomaticRecommendation(
-                expectedContext
-            );
-            if (
-                automaticFeedbackVoiceOutput ==
-                null
-            )
-                automaticFeedbackVoiceOutput =
-                    new UnityEvent<string>();
-            automaticFeedbackVoiceOutput.Invoke(
-                response.message
-            );
-            return;
-        }
-        // ========================================================
-        // DISPLAY AI FEEDBACK
-        // ========================================================
-        if (
-            AIFeedbackPanel.Instance !=
-            null
-        )
-        {
-            int displayDuration;
-            if (
-                response.cooldownSeconds >
-                0
-            )
-            {
-                displayDuration =
-                    response.cooldownSeconds;
-            }
-            else
-            {
-                displayDuration =
-                    Mathf.RoundToInt(
-                        minimumCooldownSeconds
-                    );
-            }
-            AIFeedbackPanel.Instance
-                .ShowFeedback(
-                    response.message,
-                    displayDuration,
-                    response.feedbackType ==
-                        "review"
-                );
-        }
-        else
-        {
-            Debug.LogWarning(
-                "[AIFeedbackClient] " +
-                "AIFeedbackPanel not present. " +
-                "Message: " +
-                response.message
-            );
-        }
+        // Acceptance and automatic speech are independent of the manual text-panel button.
+        if (automatic)
+            RememberDeliveredAutomaticRecommendation(expectedContext);
+        if (automaticFeedbackVoiceOutput == null)
+            automaticFeedbackVoiceOutput = new UnityEvent<string>();
+        Debug.Log("[AIFeedbackVoice] Auto-speaking accepted feedback.");
+        automaticFeedbackVoiceOutput.Invoke(LatestFeedback);
     }
 }

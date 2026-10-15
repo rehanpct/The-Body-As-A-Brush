@@ -1,216 +1,113 @@
+
+using System;
 using System.IO;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 
 public class ArtworkResultUI : MonoBehaviour
 {
-    [Header("UI References")]
+    [Header("Existing Scene References")]
     public RawImage artworkPreview;
+    public TMP_Text objectsValue;
+    public TMP_Text gesturesValue;
+    public TMP_Text timeValue;
+    public TMP_Text feedbackText;
 
-    public Text themeText;
-    public Text creationTimeText;
+    [Header("Existing Taiwan Layout References")]
+    [SerializeField] private RawImage taiwanArtworkPreview;
+    [SerializeField] private TMP_Text taiwanObjectsValue;
+    [SerializeField] private TMP_Text taiwanGesturesValue;
+    [SerializeField] private TMP_Text taiwanTimeValue;
+    [SerializeField] private TMP_Text taiwanFeedbackText;
 
-    public Text waterText;
-    public Text coralText;
-    public Text fishText;
-    public Text bubblesText;
-    public Text lanternText;
-
-    public Text indexText;
-    public Text openPalmText;
-    public Text vSignText;
-    public Text thumbUpText;
-
-    public Text totalDistanceText;
-    public Text averageSpeedText;
-    public Text maximumSpeedText;
-    public Text pauseTimeText;
-
-    public Text handSamplesText;
-    public Text gesturesUsedText;
-    public Text totalElementsText;
-
-    public Text aiTitleText;
-    public Text aiDescriptionText;
+    [Header("Scene Navigation")]
+    [SerializeField] private string drawingSceneName = "DrawingScene";
+    [SerializeField] private string mainMenuSceneName = "MainMenu";
 
     private ArtworkResultData result;
+    private Texture2D loadedArtworkTexture;
 
-    // =========================================================
-    // START
-    // =========================================================
+    private void OnEnable() { LanguageManager.LanguageChanged += RefreshFeedbackLanguage; }
+    private void OnDisable() { LanguageManager.LanguageChanged -= RefreshFeedbackLanguage; }
+    private void RefreshFeedbackLanguage()
+    {
+        if (result != null)
+            DisplayAIFeedback();
+    }
 
     private void Start()
     {
         LoadResultData();
     }
 
-    // =========================================================
-    // LOAD RESULT DATA
-    // =========================================================
+    private void OnDestroy()
+    {
+        if (artworkPreview != null &&
+            artworkPreview.texture == loadedArtworkTexture)
+        {
+            artworkPreview.texture = null;
+        }
+
+        if (loadedArtworkTexture != null)
+        {
+            Destroy(loadedArtworkTexture);
+            loadedArtworkTexture = null;
+        }
+    }
 
     private void LoadResultData()
     {
         if (ArtworkResultManager.Instance == null)
         {
             Debug.LogError(
-                "ArtworkResultUI: " +
-                "ArtworkResultManager.Instance is NULL."
+                "ArtworkResultUI: ArtworkResultManager is missing."
             );
-
             return;
         }
 
         if (!ArtworkResultManager.Instance.HasResult())
         {
             Debug.LogError(
-                "ArtworkResultUI: " +
-                "No artwork result data available."
+                "ArtworkResultUI: No artwork result is available."
             );
-
             return;
         }
 
-        result =
-            ArtworkResultManager.Instance.CurrentResult;
+        result = ArtworkResultManager.Instance.CurrentResult;
 
-        if (result.artworkData == null)
+        if (result == null || result.artworkData == null)
         {
             Debug.LogError(
-                "ArtworkResultUI: ArtworkData is NULL."
+                "ArtworkResultUI: Result or ArtworkData is missing."
             );
-
             return;
+        }
+
+        if (ArtworkResultThemeSwitcher.IsTaiwanTheme(result.theme))
+        {
+            artworkPreview = taiwanArtworkPreview;
+            objectsValue = taiwanObjectsValue;
+            gesturesValue = taiwanGesturesValue;
+            timeValue = taiwanTimeValue;
+            feedbackText = taiwanFeedbackText;
         }
 
         DisplayResult();
     }
 
-    // =========================================================
-    // DISPLAY RESULT
-    // =========================================================
-
     private void DisplayResult()
     {
-        ArtworkData data =
-            result.artworkData;
+        ArtworkData data = result.artworkData;
 
-        // -----------------------------------------------------
-        // GENERAL
-        // -----------------------------------------------------
-
+        // STATISTIC 1: Creation time
         SetText(
-            themeText,
-            "Theme: " + result.theme
-        );
-
-        SetText(
-            creationTimeText,
-            "Creation Time: " +
+            timeValue,
             FormatTime(data.creationTime)
         );
 
-        // -----------------------------------------------------
-        // ELEMENTS
-        // -----------------------------------------------------
-
-        SetText(
-            waterText,
-            "Water Currents: " +
-            data.waterCount
-        );
-
-        SetText(
-            coralText,
-            "Coral: " +
-            data.coralCount
-        );
-
-        SetText(
-            fishText,
-            "Fish Schools: " +
-            data.fishSchoolCount
-        );
-
-        SetText(
-            bubblesText,
-            "Bubble Bursts: " +
-            data.bubbleBurstCount
-        );
-
-        SetText(
-            lanternText,
-            "Lanterns: " +
-            data.lanternCount
-        );
-
-        // -----------------------------------------------------
-        // GESTURES
-        // -----------------------------------------------------
-
-        SetText(
-            indexText,
-            "Index: " +
-            data.indexGestureCount
-        );
-
-        SetText(
-            openPalmText,
-            "Open Palm: " +
-            data.openPalmGestureCount
-        );
-
-        SetText(
-            vSignText,
-            "V Sign: " +
-            data.vSignGestureCount
-        );
-
-        SetText(
-            thumbUpText,
-            "Thumb Up: " +
-            data.thumbUpGestureCount
-        );
-
-        // -----------------------------------------------------
-        // HAND MOVEMENT
-        // -----------------------------------------------------
-
-        SetText(
-            totalDistanceText,
-            "Total Distance: " +
-            data.totalHandDistance.ToString("F2")
-        );
-
-        SetText(
-            averageSpeedText,
-            "Average Speed: " +
-            data.averageHandSpeed.ToString("F2")
-        );
-
-        SetText(
-            maximumSpeedText,
-            "Maximum Speed: " +
-            data.maximumHandSpeed.ToString("F2")
-        );
-
-        SetText(
-            pauseTimeText,
-            "Pause Time: " +
-            data.pauseTime.ToString("F1") +
-            " s"
-        );
-
-        // -----------------------------------------------------
-        // JOURNEY
-        // -----------------------------------------------------
-
-        SetText(
-            handSamplesText,
-            "Hand Tracking Samples: " +
-            data.handTrackingSamples
-        );
-
+        // STATISTIC 2: Total gestures used
         int gesturesUsed =
             data.indexGestureCount +
             data.openPalmGestureCount +
@@ -218,228 +115,205 @@ public class ArtworkResultUI : MonoBehaviour
             data.thumbUpGestureCount;
 
         SetText(
-            gesturesUsedText,
-            "Gestures Used: " +
-            gesturesUsed
+            gesturesValue,
+            gesturesUsed.ToString()
         );
 
+        // STATISTIC 3: Total elements created
         int totalElements =
             data.waterCount +
             data.coralCount +
             data.fishSchoolCount +
             data.bubbleBurstCount +
-            data.lanternCount;
+            data.lanternCount +
+            data.lightTrailCount +
+            data.petalsCount +
+            data.fireworksCount;
 
         SetText(
-            totalElementsText,
-            "Total Elements: " +
-            totalElements
+            objectsValue,
+            totalElements.ToString()
         );
-
-        // -----------------------------------------------------
-        // ARTWORK
-        // -----------------------------------------------------
 
         LoadArtworkImage();
+        DisplayAIFeedback();
 
-        // -----------------------------------------------------
-        // TEMPORARY AI
-        // -----------------------------------------------------
-
-        SetText(
-            aiTitleText,
-            string.IsNullOrEmpty(
-                result.artworkTitle)
-                ? "Your Creation"
-                : result.artworkTitle
+        Debug.Log(
+            $"Artwork result displayed. Theme: {result.theme}, " +
+            $"Time: {FormatTime(data.creationTime)}, " +
+            $"Gestures: {gesturesUsed}, Elements: {totalElements}"
         );
-
-        SetText(
-            aiDescriptionText,
-            string.IsNullOrEmpty(
-                result.aiDescription)
-                ? "AI interpretation will appear here."
-                : result.aiDescription
-        );
-
-        Debug.Log("================================");
-        Debug.Log("RESULT DATA DISPLAYED");
-        Debug.Log("Theme: " + result.theme);
-        Debug.Log("Artwork: " + result.artworkImagePath);
-        Debug.Log("================================");
     }
 
-    // =========================================================
-    // LOAD ARTWORK PNG
-    // =========================================================
+    private void DisplayAIFeedback()
+    {
+        if (feedbackText == null)
+        {
+            Debug.LogWarning(
+                "ArtworkResultUI: Feedback Text is not assigned."
+            );
+            return;
+        }
+
+        string description =
+            string.IsNullOrWhiteSpace(result.aiDescription) || result.feedbackLanguage != LanguageManager.CurrentLanguage
+                ? (LanguageManager.IsTraditionalChinese ? "你的作品評析將在此顯示。" : "Your artwork interpretation will appear here.")
+                : result.aiDescription;
+
+        // Generated feedback is the display/speech source; do not prepend a fallback title.
+        feedbackText.text = description;
+        Debug.Log("[ResultUI] Language = " + LanguageManager.CurrentLanguage +
+            "; Displayed text = " + feedbackText.text);
+    }
 
     private void LoadArtworkImage()
     {
         if (artworkPreview == null)
         {
             Debug.LogWarning(
-                "ArtworkResultUI: " +
-                "Artwork Preview is not assigned."
+                "ArtworkResultUI: ArtworkPreview is not assigned."
             );
-
             return;
         }
 
-        if (string.IsNullOrEmpty(
-            result.artworkImagePath))
+        string imagePath = result.artworkImagePath;
+
+        if (string.IsNullOrWhiteSpace(imagePath) ||
+            !File.Exists(imagePath))
         {
             Debug.LogError(
-                "ArtworkResultUI: " +
-                "Artwork image path is empty."
+                "ArtworkResultUI: Artwork image not found. Path: " +
+                imagePath
             );
-
             return;
         }
 
-        if (!File.Exists(
-            result.artworkImagePath))
+        try
         {
-            Debug.LogError(
-                "ArtworkResultUI: " +
-                "Artwork file does not exist:\n" +
-                result.artworkImagePath
-            );
+            byte[] imageBytes = File.ReadAllBytes(imagePath);
 
-            return;
-        }
-
-        byte[] imageBytes =
-            File.ReadAllBytes(
-                result.artworkImagePath
-            );
-
-        Texture2D texture =
-            new Texture2D(
+            Texture2D texture = new Texture2D(
                 2,
                 2,
                 TextureFormat.RGBA32,
                 false
             );
 
-        bool loaded =
-            texture.LoadImage(
-                imageBytes
-            );
+            if (!texture.LoadImage(imageBytes))
+            {
+                Debug.LogError(
+                    "ArtworkResultUI: Could not decode artwork image."
+                );
+                Destroy(texture);
+                return;
+            }
 
-        if (!loaded)
+            if (loadedArtworkTexture != null)
+            {
+                Destroy(loadedArtworkTexture);
+            }
+
+            loadedArtworkTexture = texture;
+            artworkPreview.texture = loadedArtworkTexture;
+            FitArtworkPreview();
+
+            Debug.Log("Artwork preview loaded successfully.");
+        }
+        catch (Exception exception)
         {
             Debug.LogError(
-                "ArtworkResultUI: " +
-                "Failed to load artwork PNG."
+                "ArtworkResultUI: Image loading failed. " +
+                exception.Message
             );
-
-            Destroy(texture);
-
-            return;
         }
-
-        artworkPreview.texture =
-            texture;
-
-        Debug.Log(
-            "Artwork preview loaded successfully."
-        );
     }
 
-    // =========================================================
-    // SAVE TO ALBUM
-    // =========================================================
+    private void FitArtworkPreview()
+    {
+        RectTransform preview = artworkPreview.rectTransform;
+        RectTransform frame = preview.parent as RectTransform;
+        if (frame == null || loadedArtworkTexture == null)
+            return;
+
+        // Match the frame sprite's rendered rectangle, including Preserve Aspect.
+        // FrameOverlay draws the inward decorations above the fitted artwork.
+        Vector2 available = frame.rect.size;
+        Image frameImage = frame.GetComponent<Image>();
+        if (frameImage != null && frameImage.preserveAspect && frameImage.sprite != null)
+        {
+            float frameAspect = frameImage.sprite.rect.width / frameImage.sprite.rect.height;
+            if (available.x / available.y > frameAspect)
+                available.x = available.y * frameAspect;
+            else
+                available.y = available.x / frameAspect;
+        }
+        // Fit inside the border rails; do not shrink to avoid the overlaid ornaments.
+        available = Vector2.Scale(available, new Vector2(0.95f, 0.88f));
+        available -= new Vector2(16f, 16f); // Add 8 px per edge inside the existing usable area.
+        float scale = Mathf.Min(available.x / loadedArtworkTexture.width,
+            available.y / loadedArtworkTexture.height);
+        preview.anchorMin = preview.anchorMax = new Vector2(0.5f, 0.5f);
+        preview.pivot = new Vector2(0.5f, 0.5f);
+        preview.anchoredPosition = Vector2.zero;
+        preview.sizeDelta = new Vector2(loadedArtworkTexture.width, loadedArtworkTexture.height) * scale;
+    }
 
     public void SaveToAlbum()
     {
         if (result == null)
         {
             Debug.LogError(
-                "ArtworkResultUI: " +
-                "No result to save."
+                "ArtworkResultUI: Nothing is available to save."
             );
-
             return;
         }
 
         if (ArtworkAlbumManager.Instance == null)
         {
             Debug.LogError(
-                "ArtworkResultUI: " +
-                "ArtworkAlbumManager.Instance is NULL."
+                "ArtworkResultUI: ArtworkAlbumManager is missing."
             );
-
             return;
         }
 
         bool saved =
-            ArtworkAlbumManager.Instance.SaveArtwork(
-                result
-            );
+            ArtworkAlbumManager.Instance.SaveArtwork(result);
 
         if (saved)
         {
-            Debug.Log(
-                "ArtworkResultUI: " +
-                "Artwork successfully added to album."
-            );
+            Debug.Log("Artwork saved to album successfully.");
         }
         else
         {
-            Debug.LogError(
-                "ArtworkResultUI: " +
-                "Failed to save artwork to album."
-            );
+            Debug.LogError("Could not save artwork to album.");
         }
     }
-
-    // =========================================================
-    // CREATE AGAIN
-    // =========================================================
 
     public void CreateAgain()
     {
-        Debug.Log(
-            "CREATE AGAIN pressed."
-        );
+        Debug.Log("Try Again pressed.");
 
         if (ArtworkResultManager.Instance != null)
         {
             ArtworkResultManager.Instance.ClearResult();
         }
 
-        SceneManager.LoadScene(
-            "DrawingScene"
-        );
+        SceneManager.LoadScene(drawingSceneName);
     }
-
-    // =========================================================
-    // BACK TO MENU
-    // =========================================================
 
     public void BackToMenu()
     {
-        Debug.Log(
-            "BACK TO MENU pressed."
-        );
+        Debug.Log("Back to Menu pressed.");
 
         if (ArtworkResultManager.Instance != null)
         {
             ArtworkResultManager.Instance.ClearResult();
         }
 
-        SceneManager.LoadScene(
-            "MainMenu"
-        );
+        SceneManager.LoadScene(mainMenuSceneName);
     }
 
-    // =========================================================
-    // TEXT HELPER
-    // =========================================================
-
-    private void SetText(
-        Text textComponent,
-        string value)
+    private void SetText(TMP_Text textComponent, string value)
     {
         if (textComponent != null)
         {
@@ -447,26 +321,17 @@ public class ArtworkResultUI : MonoBehaviour
         }
     }
 
-    // =========================================================
-    // TIME FORMAT
-    // =========================================================
-
-    private string FormatTime(
-        float seconds)
+    private string FormatTime(float seconds)
     {
-        int minutes =
-            Mathf.FloorToInt(
-                seconds / 60f
-            );
+        int totalSeconds = Mathf.Max(
+            0,
+            Mathf.FloorToInt(seconds)
+        );
 
-        int remainingSeconds =
-            Mathf.FloorToInt(
-                seconds % 60f
-            );
+        int minutes = totalSeconds / 60;
+        int remainingSeconds = totalSeconds % 60;
 
-        return
-            minutes.ToString("00") +
-            ":" +
-            remainingSeconds.ToString("00");
+        return minutes.ToString("00") + ":" +
+               remainingSeconds.ToString("00");
     }
 }

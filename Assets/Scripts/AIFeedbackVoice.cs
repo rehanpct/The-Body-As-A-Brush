@@ -7,10 +7,35 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.UI;
 using Debug = UnityEngine.Debug;
 
-public sealed class AIFeedbackVoice : MonoBehaviour
+public sealed class AIFeedbackVoice : MonoBehaviour, IPointerClickHandler
 {
+    private static volatile bool isMuted;
+    public static bool IsMuted => isMuted;
+    public static event Action MuteStateChanged;
+
+    public static void SetMuted(bool muted)
+    {
+        if (isMuted == muted)
+            return;
+        isMuted = muted;
+        if (muted)
+            foreach (AIFeedbackVoice voice in FindObjectsByType<AIFeedbackVoice>(FindObjectsInactive.Include))
+                voice.CancelSpeech(false);
+        MuteStateChanged?.Invoke();
+        Debug.Log("[AIFeedbackVoice] AI voice " + (muted ? "muted." : "enabled."));
+    }
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetRuntimeMute()
+    {
+        isMuted = false;
+        MuteStateChanged = null;
+    }
+
     [Header("Windows Voice")]
     [SerializeField] private bool voiceEnabled = true;
     [SerializeField, Range(-10, 10)] private int speechRate = 0;
@@ -18,6 +43,7 @@ public sealed class AIFeedbackVoice : MonoBehaviour
     [SerializeField, Tooltip("Exact installed Windows voice name.")]
     private string windowsVoiceName = "Microsoft Hanhan Desktop";
     [SerializeField] private bool interruptCurrentSpeech = true;
+    [SerializeField] private bool replayFromPanelIcon;
 
     private const int SpeechTimeoutMilliseconds = 90000;
     private readonly object stateLock = new object();
@@ -36,11 +62,13 @@ public sealed class AIFeedbackVoice : MonoBehaviour
         public readonly int rate;
         public readonly int volume;
         public readonly string voiceName;
+        public readonly string language;
         public bool cancelled;
 
-        public SpeechJob(string text, int speechRate, int speechVolume, string selectedVoice)
+        public SpeechJob(string text, int speechRate, int speechVolume, string selectedVoice, string selectedLanguage)
         {
             message = text; rate = speechRate; volume = speechVolume; voiceName = selectedVoice;
+            language = selectedLanguage;
         }
     }
 
@@ -53,6 +81,8 @@ public sealed class AIFeedbackVoice : MonoBehaviour
 
     public void Speak(string message)
     {
+        if (IsMuted)
+            return;
         Debug.Log("[AIFeedbackVoice][RECEIVED TEXT] " + (message ?? "<NULL>"));
         if (!voiceEnabled) { Debug.Log("[AIFeedbackVoice] Voice disabled."); return; }
         if (!IsWindows()) { Debug.LogWarning("[AIFeedbackVoice] Windows TTS is available only in Windows Editor/Player."); return; }
@@ -65,16 +95,19 @@ public sealed class AIFeedbackVoice : MonoBehaviour
             return;
         }
 
-        string requestedVoice = string.IsNullOrWhiteSpace(windowsVoiceName) ? string.Empty : windowsVoiceName.Trim();
+        string language = LanguageManager.CurrentLanguage;
+        string requestedVoice = ResolveVoiceName(language);
+        Debug.Log("[AIFeedbackVoice] Language = " + language + "; Voice = " + requestedVoice +
+            "; Text being spoken = " + cleanMessage + "; Inspector preference = " + windowsVoiceName);
         Debug.Log("[AIFeedbackVoice][REQUESTED VOICE] " +
                   (string.IsNullOrEmpty(requestedVoice) ? "<automatic/default>" : requestedVoice));
 
         SpeechJob job = new SpeechJob(cleanMessage, Mathf.Clamp(speechRate, -10, 10),
-            Mathf.Clamp(volume, 0, 100), requestedVoice);
+            Mathf.Clamp(volume, 0, 100), requestedVoice, language);
 
         lock (stateLock)
         {
-            if (shuttingDown) return;
+            if (shuttingDown || IsMuted) return;
             if (interruptCurrentSpeech)
             {
                 CancelActiveJobLocked();
@@ -98,6 +131,52 @@ public sealed class AIFeedbackVoice : MonoBehaviour
         Debug.Log("[AIFeedbackVoice] Speech queued.");
     }
 
+    private static string ResolveVoiceName(string language)
+    {
+        return language == "zh-TW" ? "Microsoft Hanhan Desktop" : "Microsoft Zira Desktop";
+    }
+
+    private void OnEnable() { LanguageManager.LanguageChanged += OnLanguageChanged; }
+    private void OnLanguageChanged() { CancelSpeech(false); }
+
+    public void ReplayDisplayedFeedback()
+    {
+        ArtworkResultUI resultUI = FindAnyObjectByType<ArtworkResultUI>();
+        if (resultUI != null && resultUI.feedbackText != null && resultUI.feedbackText.isActiveAndEnabled)
+            Speak(resultUI.feedbackText.text);
+        else if (BodyAsBrush.UI.AIFeedbackPanel.Instance != null)
+            Speak(BodyAsBrush.UI.AIFeedbackPanel.Instance.DisplayedFeedback);
+        else
+            Debug.LogWarning("[AIFeedbackVoice] No displayed feedback is available to replay.");
+    }
+
+    public void OnPointerClick(PointerEventData eventData)
+    {
+        if (!replayFromPanelIcon || eventData.button != PointerEventData.InputButton.Left)
+            return;
+        RectTransform panel = transform as RectTransform;
+        Image image = GetComponent<Image>();
+        if (panel == null || image == null || image.sprite == null ||
+            !RectTransformUtility.ScreenPointToLocalPointInRectangle(panel, eventData.position,
+                eventData.pressEventCamera, out Vector2 local))
+            return;
+        // The speaker is baked into the existing panel sprite, not a separate GameObject.
+        Rect drawn = panel.rect;
+        if (image.preserveAspect)
+        {
+            float aspect = image.sprite.rect.width / image.sprite.rect.height;
+            Vector2 size = drawn.size;
+            if (size.x / size.y > aspect) size.x = size.y * aspect;
+            else size.y = size.x / aspect;
+            drawn.position += Vector2.Scale(drawn.size - size, panel.pivot);
+            drawn.size = size;
+        }
+        Vector2 point = (local - drawn.position) / drawn.size;
+        Vector2 radius = new Vector2((point.x - 0.102f) / 0.055f, (point.y - 0.235f) / 0.115f);
+        if (radius.sqrMagnitude <= 1f)
+            ReplayDisplayedFeedback();
+    }
+
     private void Update()
     {
         while (true)
@@ -113,7 +192,11 @@ public sealed class AIFeedbackVoice : MonoBehaviour
         }
     }
 
-    private void OnDisable() { CancelSpeech(false); }
+    private void OnDisable()
+    {
+        LanguageManager.LanguageChanged -= OnLanguageChanged;
+        CancelSpeech(false);
+    }
     private void OnDestroy() { CancelSpeech(true); }
 
     private void CancelSpeech(bool destroying)
@@ -141,7 +224,7 @@ public sealed class AIFeedbackVoice : MonoBehaviour
             SpeechJob job;
             lock (stateLock)
             {
-                if (shuttingDown || pendingSpeech.Count == 0)
+                if (shuttingDown || IsMuted || pendingSpeech.Count == 0)
                 {
                     speechWorkerRunning = false;
                     return;
@@ -173,7 +256,7 @@ public sealed class AIFeedbackVoice : MonoBehaviour
 
             lock (stateLock)
             {
-                if (shuttingDown || job.cancelled)
+                if (shuttingDown || IsMuted || job.cancelled)
                 {
                     if (activeJob == job) activeJob = null;
                     process.Dispose();
@@ -247,6 +330,7 @@ public sealed class AIFeedbackVoice : MonoBehaviour
         string voiceBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(job.voiceName ?? string.Empty));
         string script =
             "$ErrorActionPreference='Stop';$synth=$null;try{" +
+            "[Console]::OutputEncoding=New-Object Text.UTF8Encoding($false);" +
             "Add-Type -AssemblyName System.Speech;" +
             "$synth=New-Object System.Speech.Synthesis.SpeechSynthesizer;" +
             "$voices=@($synth.GetInstalledVoices()|Where-Object{$_.Enabled}|ForEach-Object{$_.VoiceInfo.Name});" +
@@ -257,6 +341,7 @@ public sealed class AIFeedbackVoice : MonoBehaviour
             "if($voices -notcontains $voice){Write-Output ('TTSVOICEERROR|Requested voice not installed or disabled: ' + $voice);exit 5};" +
             "try{$synth.SelectVoice($voice)}catch{Write-Output ('TTSVOICEERROR|SelectVoice failed: ' + $_.Exception.Message);exit 6};" +
             "Write-Output ('TTSVOICE|' + $synth.Voice.Name);" +
+            "Write-Output ('TTSLANGUAGE|" + job.language + "');" +
             "$synth.Rate=" + job.rate + ";" +
             "$synth.Volume=" + job.volume + ";" +
             "$text=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('" + messageBase64 + "'));" +

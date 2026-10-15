@@ -17,9 +17,10 @@ public class ArtworkResultThemeSwitcher : MonoBehaviour
         string selectedTheme =
             PlayerPrefs.GetString("SelectedTheme", "Underwater");
 
-        bool isTaiwan =
-            selectedTheme.Trim().ToLowerInvariant().Contains("taiwan") ||
-            selectedTheme.Trim().ToLowerInvariant().Contains("nightmarket");
+        if (ArtworkResultManager.Instance != null && ArtworkResultManager.Instance.HasResult())
+            selectedTheme = ArtworkResultManager.Instance.CurrentResult.theme;
+
+        bool isTaiwan = IsTaiwanTheme(selectedTheme);
 
         if (underwaterTheme != null)
             underwaterTheme.SetActive(!isTaiwan);
@@ -31,5 +32,11 @@ public class ArtworkResultThemeSwitcher : MonoBehaviour
             $"[ArtworkResultThemeSwitcher] Selected theme: {selectedTheme}. " +
             $"Showing: {(isTaiwan ? "Taiwan" : "Underwater")}"
         );
+    }
+
+    public static bool IsTaiwanTheme(string theme)
+    {
+        string normalized = (theme ?? "").Trim().ToLowerInvariant();
+        return normalized.Contains("taiwan") || normalized.Contains("nightmarket");
     }
 }

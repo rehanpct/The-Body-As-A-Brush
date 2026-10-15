@@ -25,13 +25,24 @@ public class ArtworkResultManager : MonoBehaviour
     {
         CurrentResult = new ArtworkResultData();
 
-        CurrentResult.artworkData = artworkData;
+        // Transfer a value snapshot, independent of the drawing scene's tracker.
+        CurrentResult.artworkData = JsonUtility.FromJson<ArtworkData>(
+            JsonUtility.ToJson(artworkData));
         CurrentResult.artworkImagePath = artworkImagePath;
         CurrentResult.theme = theme;
+        AIFeedbackClient feedback = AIFeedbackClient.Instance;
+        if (feedback != null && feedback.LatestFeedbackLanguage == LanguageManager.CurrentLanguage &&
+            feedback.LatestFeedbackTheme == theme && !string.IsNullOrWhiteSpace(feedback.LatestFeedback))
+        {
+            CurrentResult.aiDescription = feedback.LatestFeedback;
+            CurrentResult.feedbackLanguage = feedback.LatestFeedbackLanguage;
+        }
         CurrentResult.createdAt =
             System.DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
 
         Debug.Log("Artwork result data stored.");
+        Debug.Log("[ResultManager] Language = " + LanguageManager.CurrentLanguage +
+            "; Stored feedback = " + CurrentResult.aiDescription);
     }
 
     public bool HasResult()
@@ -42,5 +53,16 @@ public class ArtworkResultManager : MonoBehaviour
     public void ClearResult()
     {
         CurrentResult = null;
+    }
+
+    public void RestoreResult(ArtworkResultData result)
+    {
+        CurrentResult = result;
+    }
+
+    private void OnDestroy()
+    {
+        if (Instance == this)
+            Instance = null;
     }
 }

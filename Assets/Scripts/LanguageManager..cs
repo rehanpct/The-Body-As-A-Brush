@@ -12,8 +12,15 @@ public class LanguageManager : MonoBehaviour
     {
         get
         {
-            return PlayerPrefs.GetString(LanguageKey, "en");
+            return NormalizeLanguage(PlayerPrefs.GetString(LanguageKey, "en"));
         }
+    }
+
+    public static string NormalizeLanguage(string language)
+    {
+        string normalized = (language ?? "").Trim().ToLowerInvariant();
+        return normalized == "chinese" || normalized == "zh" || normalized == "zh-tw"
+            ? "zh-TW" : "en";
     }
 
     public static bool IsTraditionalChinese

@@ -24,15 +24,16 @@ namespace BodyAsBrush.UI
         [SerializeField] private string coralColor = "#FF8A65";
 
         private Coroutine displayCoroutine;
+        public string DisplayedFeedback => feedbackText != null ? feedbackText.text : string.Empty;
 
         private void OnEnable()
         {
-            LanguageManager.LanguageChanged += RefreshTitle;
+            LanguageManager.LanguageChanged += RefreshLanguage;
         }
 
         private void OnDisable()
         {
-            LanguageManager.LanguageChanged -= RefreshTitle;
+            LanguageManager.LanguageChanged -= RefreshLanguage;
         }
 
         private void Awake()
@@ -72,7 +73,7 @@ namespace BodyAsBrush.UI
                 Instance = null;
             }
 
-            LanguageManager.LanguageChanged -= RefreshTitle;
+            LanguageManager.LanguageChanged -= RefreshLanguage;
         }
 
         private bool IsTraditionalChinese()
@@ -88,6 +89,13 @@ namespace BodyAsBrush.UI
             }
 
             titleText.text = GetLocalizedTitle(false);
+        }
+
+        private void RefreshLanguage()
+        {
+            RefreshTitle();
+            if (feedbackText != null && !string.IsNullOrWhiteSpace(feedbackText.text))
+                feedbackText.text = GetFallbackMessage();
         }
 
         private string GetLocalizedTitle(bool isCreativeReview)
@@ -118,12 +126,25 @@ namespace BodyAsBrush.UI
             bool isCreativeReview
         )
         {
-            if (canvasGroup == null || feedbackText == null)
+            if (canvasGroup == null)
             {
-                Debug.LogWarning(
-                    "[AIFeedbackPanel] CanvasGroup or FeedbackText is not assigned."
-                );
+                Debug.LogError("[ManualFeedback] AIFeedbackPanel.canvasGroup is not assigned on " + name, this);
+                return;
+            }
+            if (feedbackText == null)
+            {
+                Debug.LogError("[ManualFeedback] AIFeedbackPanel.feedbackText is not assigned on " + name, this);
+                return;
+            }
 
+            if (!gameObject.activeSelf)
+                gameObject.SetActive(true);
+            if (!enabled)
+                enabled = true;
+            if (!gameObject.activeInHierarchy)
+            {
+                Debug.LogError("[ManualFeedback] AIFeedbackPanel is hidden by an inactive parent: " +
+                    transform.parent.name, this);
                 return;
             }
 
@@ -134,11 +155,14 @@ namespace BodyAsBrush.UI
 
             if (displayCoroutine != null)
             {
-                StopCoroutine(displayCoroutine);
+                // Stop the previous sequence and its separately started fade coroutine.
+                StopAllCoroutines();
             }
 
             feedbackText.richText = true;
             feedbackText.text = FormatFeedback(message);
+            Debug.Log("[AIFeedbackPanel] Language = " + LanguageManager.CurrentLanguage +
+                "; Displaying feedback = " + feedbackText.text);
 
             displayCoroutine = StartCoroutine(DisplaySequence());
         }

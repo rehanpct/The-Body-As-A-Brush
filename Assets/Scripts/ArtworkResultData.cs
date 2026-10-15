@@ -9,6 +9,7 @@ public class ArtworkResultData
     public string artworkTitle;
     public string aiDescription;
     public string aiInterpretation;
+    public string feedbackLanguage;
 
     public string theme;
     public string createdAt;
