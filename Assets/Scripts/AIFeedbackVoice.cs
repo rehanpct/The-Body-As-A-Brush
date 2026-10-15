@@ -143,7 +143,7 @@ public sealed class AIFeedbackVoice : MonoBehaviour, IPointerClickHandler
     {
         ArtworkResultUI resultUI = FindAnyObjectByType<ArtworkResultUI>();
         if (resultUI != null && resultUI.feedbackText != null && resultUI.feedbackText.isActiveAndEnabled)
-            Speak(resultUI.feedbackText.text);
+            Speak(resultUI.ReplayableFinalFeedback);
         else if (BodyAsBrush.UI.AIFeedbackPanel.Instance != null)
             Speak(BodyAsBrush.UI.AIFeedbackPanel.Instance.DisplayedFeedback);
         else

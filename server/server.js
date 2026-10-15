@@ -802,6 +802,12 @@ in the Unity artwork data.
 
 // ============================================================
 
+// A larger JSON parser applies only to final PNG analysis; live feedback stays unchanged.
+app.post("/api/artwork-feedback", express.json({ limit: "28mb" }),
+  require("./final-artwork-feedback").createFinalArtworkHandler({
+    client, model: CONFIG.openaiModel, mockAI: CONFIG.mockAI, checkRateLimit
+  }));
+
 app.use(
 
   express.json({

@@ -1,10 +1,13 @@
 
 using System;
+using System.Collections;
 using System.IO;
+using System.Text;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
+using UnityEngine.Networking;
 
 public class ArtworkResultUI : MonoBehaviour
 {
@@ -28,13 +31,48 @@ public class ArtworkResultUI : MonoBehaviour
 
     private ArtworkResultData result;
     private Texture2D loadedArtworkTexture;
+    private byte[] loadedArtworkPng;
+    private Coroutine finalAnalysis;
+    private UnityWebRequest finalAnalysisRequest;
+    private bool analyzingFinalArtwork;
 
-    private void OnEnable() { LanguageManager.LanguageChanged += RefreshFeedbackLanguage; }
-    private void OnDisable() { LanguageManager.LanguageChanged -= RefreshFeedbackLanguage; }
+    [Header("Final Artwork Analysis")]
+    [SerializeField] private string finalArtworkFeedbackUrl =
+        "https://the-body-as-a-brush.onrender.com/api/artwork-feedback";
+
+    [Serializable]
+    private class FinalArtworkRequest
+    {
+        public string sessionId;
+        public string language;
+        public string imageBase64;
+    }
+
+    [Serializable]
+    private class FinalArtworkResponse
+    {
+        public string finalArtworkFeedback;
+        public string language;
+    }
+
+    public string ReplayableFinalFeedback => !analyzingFinalArtwork && result != null &&
+        result.finalFeedbackLanguage == LanguageManager.CurrentLanguage && feedbackText != null
+        ? feedbackText.text : string.Empty;
+
+    private void OnEnable()
+    {
+        LanguageManager.LanguageChanged += RefreshFeedbackLanguage;
+        if (result != null) BeginFinalArtworkAnalysis();
+    }
+    private void OnDisable()
+    {
+        LanguageManager.LanguageChanged -= RefreshFeedbackLanguage;
+        CancelFinalAnalysis();
+    }
     private void RefreshFeedbackLanguage()
     {
         if (result != null)
-            DisplayAIFeedback();
+            BeginFinalArtworkAnalysis();
     }
 
     private void Start()
@@ -136,7 +174,7 @@ public class ArtworkResultUI : MonoBehaviour
         );
 
         LoadArtworkImage();
-        DisplayAIFeedback();
+        BeginFinalArtworkAnalysis();
 
         Debug.Log(
             $"Artwork result displayed. Theme: {result.theme}, " +
@@ -155,15 +193,111 @@ public class ArtworkResultUI : MonoBehaviour
             return;
         }
 
-        string description =
-            string.IsNullOrWhiteSpace(result.aiDescription) || result.feedbackLanguage != LanguageManager.CurrentLanguage
-                ? (LanguageManager.IsTraditionalChinese ? "你的作品評析將在此顯示。" : "Your artwork interpretation will appear here.")
-                : result.aiDescription;
+        string description = !analyzingFinalArtwork &&
+            result.finalFeedbackLanguage == LanguageManager.CurrentLanguage &&
+            !string.IsNullOrWhiteSpace(result.finalArtworkFeedback)
+                ? result.finalArtworkFeedback
+                : (LanguageManager.IsTraditionalChinese ? "正在欣賞你的作品..." : "Analyzing your artwork...");
 
         // Generated feedback is the display/speech source; do not prepend a fallback title.
         feedbackText.text = description;
         Debug.Log("[ResultUI] Language = " + LanguageManager.CurrentLanguage +
             "; Displayed text = " + feedbackText.text);
+    }
+
+    private void CancelFinalAnalysis()
+    {
+        if (finalAnalysisRequest != null)
+        {
+            finalAnalysisRequest.Abort();
+            finalAnalysisRequest.Dispose();
+            finalAnalysisRequest = null;
+        }
+        if (finalAnalysis != null) StopCoroutine(finalAnalysis);
+        finalAnalysis = null;
+    }
+
+    private void BeginFinalArtworkAnalysis()
+    {
+        CancelFinalAnalysis();
+        if (!string.IsNullOrWhiteSpace(result.finalArtworkFeedback) &&
+            result.finalFeedbackLanguage == LanguageManager.CurrentLanguage)
+        {
+            analyzingFinalArtwork = false;
+            DisplayAIFeedback();
+            return;
+        }
+        analyzingFinalArtwork = true;
+        DisplayAIFeedback();
+        finalAnalysis = StartCoroutine(AnalyzeFinalArtwork(LanguageManager.CurrentLanguage));
+    }
+
+    private IEnumerator AnalyzeFinalArtwork(string language)
+    {
+        if (loadedArtworkPng == null || loadedArtworkPng.Length == 0)
+        {
+            CompleteFinalAnalysis(null, language, "The final preview PNG could not be loaded: " + result.artworkImagePath);
+            yield break;
+        }
+        UnityWebRequestAsyncOperation operation;
+        try
+        {
+            string json = JsonUtility.ToJson(new FinalArtworkRequest
+            {
+                sessionId = Guid.NewGuid().ToString("N"),
+                language = language,
+                imageBase64 = Convert.ToBase64String(loadedArtworkPng)
+            });
+            finalAnalysisRequest = new UnityWebRequest(finalArtworkFeedbackUrl, "POST");
+            finalAnalysisRequest.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(json));
+            finalAnalysisRequest.downloadHandler = new DownloadHandlerBuffer();
+            finalAnalysisRequest.SetRequestHeader("Content-Type", "application/json");
+            finalAnalysisRequest.timeout = 90;
+            operation = finalAnalysisRequest.SendWebRequest();
+        }
+        catch (Exception exception)
+        {
+            if (finalAnalysisRequest != null) finalAnalysisRequest.Dispose();
+            finalAnalysisRequest = null;
+            CompleteFinalAnalysis(null, language, exception.Message);
+            yield break;
+        }
+        Debug.Log("[FinalArtworkAI] CAPTRACK_LANGUAGE = " + language + "; PNG = " +
+            result.artworkImagePath + "; Bytes = " + loadedArtworkPng.Length);
+        yield return operation;
+        UnityWebRequest request = finalAnalysisRequest;
+        finalAnalysisRequest = null;
+        try
+        {
+            if (request.result != UnityWebRequest.Result.Success)
+                throw new Exception("HTTP " + request.responseCode + ": " + request.error + "; " + request.downloadHandler.text);
+            FinalArtworkResponse response = JsonUtility.FromJson<FinalArtworkResponse>(request.downloadHandler.text);
+            if (response == null || response.language != language || string.IsNullOrWhiteSpace(response.finalArtworkFeedback))
+                throw new Exception("The final artwork response is empty or has the wrong language.");
+            CompleteFinalAnalysis(response.finalArtworkFeedback, language, null);
+        }
+        catch (Exception exception)
+        {
+            CompleteFinalAnalysis(null, language, exception.Message);
+        }
+        finally { request.Dispose(); }
+        finalAnalysis = null;
+    }
+
+    private void CompleteFinalAnalysis(string feedback, string language, string error)
+    {
+        if (language != LanguageManager.CurrentLanguage) return;
+        if (error != null) Debug.LogError("[FinalArtworkAI] Analysis failed: " + error);
+        result.finalArtworkFeedback = !string.IsNullOrWhiteSpace(feedback) ? feedback :
+            (language == "zh-TW" ? "你的作品完成了，謝謝你和我們一起創作。" :
+                "Your artwork is complete. Thank you for creating with us.");
+        result.finalFeedbackLanguage = language;
+        // Keep album serialization compatible, using only the new final critique.
+        result.aiDescription = result.finalArtworkFeedback;
+        result.feedbackLanguage = language;
+        analyzingFinalArtwork = false;
+        DisplayAIFeedback();
+        Debug.Log("[FinalArtworkAI] Response = " + result.finalArtworkFeedback);
     }
 
     private void LoadArtworkImage()
@@ -214,6 +348,7 @@ public class ArtworkResultUI : MonoBehaviour
             }
 
             loadedArtworkTexture = texture;
+            loadedArtworkPng = imageBytes; // Send the exact bytes decoded by ArtworkPreview, without recapture/re-encoding.
             artworkPreview.texture = loadedArtworkTexture;
             FitArtworkPreview();
 
